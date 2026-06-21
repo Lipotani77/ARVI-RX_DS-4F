@@ -17,3 +17,5 @@ assets/
 
 # Local duplicate; the shareable PDF lives in docs/appel_offre.pdf
 /appel_offre.pdf
+
+/.vscode/
