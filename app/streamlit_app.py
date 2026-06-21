@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
+
+# Rend la racine du projet importable, quel que soit le dossier de lancement.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
 from PIL import Image
 
