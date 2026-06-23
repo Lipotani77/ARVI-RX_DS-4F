@@ -5,15 +5,43 @@ from PIL import Image
 from transformers import pipeline
 
 _PIPE = None
-def _get_pipe():
-    """ cette fonction permet de ne charger qu'une fois medgemma qu'une seule fois
+_PIPE_DEVICE = None
+
+def _resolve_device(device: str | None = None) -> str:
+    """ Détermine le device à utiliser selon la config de la machine
+
+    Args:
+        device (str | None): "cuda", "cpu" ou None pour auto-détection
+
+    Returns:
+        str: "cuda" si demandé/disponible, sinon "cpu"
+    """
+    if device is None:
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return device
+
+def _get_pipe(device: str | None = None):
+    """ cette fonction permet de ne charger medgemma qu'une seule fois
+
+    Args:
+        device (str | None, optional): "cuda" ou "cpu". None = auto-détection. Defaults to None.
 
     Returns:
         object: objet pipeline de medgemma
     """
-    global _PIPE
-    if _PIPE is None:
-        _PIPE = pipeline("image-text-to-text", model="google/medgemma-4b-it", torch_dtype=torch.bfloat16, device="cuda")
+    global _PIPE, _PIPE_DEVICE
+    resolved = _resolve_device(device) # on résout le device demandé
+    # on recharge si le pipeline n'existe pas ou si le device demandé a changé
+    if _PIPE is None or _PIPE_DEVICE != resolved:
+        # bfloat16 partout : ~2x moins de RAM que float32 (~8 Go au lieu de ~16 Go),
+        _PIPE = pipeline(
+            "image-text-to-text",
+            model="google/medgemma-4b-it",
+            torch_dtype=torch.bfloat16,
+            device=resolved,
+            model_kwargs={"low_cpu_mem_usage": True}, # low_cpu_mem_usage réduit le pic de mémoire pendant le chargement
+        )
+        _PIPE_DEVICE = resolved
     return _PIPE
 
 # ======================================================================================
@@ -25,6 +53,7 @@ SYSTEM = ("Tu es un assistant pédagogique d'analyse de radiographies thoracique
 
 
 # le paramètre 'mode' sert à comparer baseline vs prompt amélioré
+# le prompt cidessous est un prompt test
 PROMPTS = {
     "baseline": """Analyse cette radiographie thoracique frontale.
 Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
@@ -37,12 +66,14 @@ En cas de doute, utilise la classe "uncertain".""",
 # ======================================================================================
 # pipeline de prédiction pour MedGemma
 # ======================================================================================
-def medgemma_predict(image_path: str | Path, mode: str = "baseline") -> dict[str, Any]:
+def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str | None = None) -> dict[str, Any]:
     """ Cette fonction permet d'obtenir la prédiction de MedGemma pour une image donnée
 
     Args:
         image_path (str | Path): path vers l'image à analyser
         mode (str, optional): mode : choix entre baseline et improved. Defaults to "baseline"
+        device (str | None, optional): "cuda" ou "cpu" selon la config de la machine.
+            None = auto-détection (cuda si disponible, sinon cpu). Defaults to None.
 
     Returns:
         dict[str, Any]: dictionnaire contenant la prédiction de MedGemma
@@ -55,7 +86,11 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline") -> dict[str
             {"type": "text", "text": PROMPTS[mode]},
         ]},
     ]
-    out = _get_pipe()(text=messages, max_new_tokens=512)
+    resolved = _resolve_device(device)
+    # en CPU on génère moins de tokens : plus rapide et moins de RAM sur les petits PC.
+    # Le JSON attendu reste court, 256 tokens suffisent largement.
+    max_new_tokens = 256 if resolved == "cpu" else 512
+    out = _get_pipe(device)(text=messages, max_new_tokens=max_new_tokens)
     raw = out[0]["generated_text"][-1]["content"]
     return _coerce_json(raw)
 
