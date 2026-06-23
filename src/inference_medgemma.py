@@ -7,6 +7,8 @@ from transformers import pipeline
 _PIPE = None
 _PIPE_DEVICE = None
 
+MIN_VRAM_BYTES = 8 * 1024 ** 3  # 8 Go minimum pour medgemma-4b en bfloat16
+
 def _resolve_device(device: str | None = None) -> str:
     """ Détermine le device à utiliser selon la config de la machine
 
@@ -14,10 +16,13 @@ def _resolve_device(device: str | None = None) -> str:
         device (str | None): "cuda", "cpu" ou None pour auto-détection
 
     Returns:
-        str: "cuda" si demandé/disponible, sinon "cpu"
+        str: "cuda" si GPU disponible avec assez de VRAM, sinon "cpu"
     """
     if device is None:
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            free_vram, _ = torch.cuda.mem_get_info()
+            return "cuda" if free_vram >= MIN_VRAM_BYTES else "cpu"
+        return "cpu"
     return device
 
 def _get_pipe(device: str | None = None):
