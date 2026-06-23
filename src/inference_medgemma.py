@@ -13,11 +13,16 @@ def _get_pipe():
     """
     global _PIPE
     if _PIPE is None:
-        _PIPE = pipeline("image-text-to-text", model="google/medgemma-4b-it", torch_dtype=torch.bfloat16,device_map="auto",)
+        _PIPE = pipeline("image-text-to-text", model="google/medgemma-4b-it", torch_dtype=torch.bfloat16, device="cuda")
     return _PIPE
+
+# ======================================================================================
+# Prompt et fonction de prédiction pour MedGemma
+# ======================================================================================
 
 SYSTEM = ("Tu es un assistant pédagogique d'analyse de radiographies thoraciques. "
           "Tu n'es pas un dispositif médical.")
+
 
 # le paramètre 'mode' sert à comparer baseline vs prompt amélioré
 PROMPTS = {
@@ -29,7 +34,19 @@ En cas de doute, utilise la classe "uncertain".""",
     # "improved": "...prompt renforcé : contrôle qualité image, pas d'invention, seuil d'incertitude..."
 }
 
+# ======================================================================================
+# pipeline de prédiction pour MedGemma
+# ======================================================================================
 def medgemma_predict(image_path: str | Path, mode: str = "baseline") -> dict[str, Any]:
+    """ Cette fonction permet d'obtenir la prédiction de MedGemma pour une image donnée
+
+    Args:
+        image_path (str | Path): path vers l'image à analyser
+        mode (str, optional): mode : choix entre baseline et improved. Defaults to "baseline"
+
+    Returns:
+        dict[str, Any]: dictionnaire contenant la prédiction de MedGemma
+    """
     image = Image.open(image_path).convert("RGB")
     messages = [
         {"role": "system", "content": [{"type": "text", "text": SYSTEM}]},
@@ -43,6 +60,14 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline") -> dict[str
     return _coerce_json(raw)
 
 def _coerce_json(raw: str) -> dict[str, Any]:
+    """ Cette fonction tente d'extraire un JSON valide de la sortie brute du modèle
+
+    Args:
+        raw (str): _description_
+
+    Returns:
+        dict[str, Any]: _description_
+    """
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     try:
         data = json.loads(m.group(0)) if m else {}

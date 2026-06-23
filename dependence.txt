@@ -1,0 +1,4 @@
+pip install "transformers>=4.50.0" accelerate torch pillow
+pip install huggingface_hub
+hf auth login
+# Coller ton token HF (Settings > Access Tokens > New token avec rôle "read")
