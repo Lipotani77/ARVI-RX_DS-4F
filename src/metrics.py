@@ -5,6 +5,14 @@ from typing import Iterable
 
 CLASSES = ["normal", "suspected_opacity", "uncertain"]
 
+# Seuils de qualité du projet (operator, threshold)
+TARGETS: dict[str, tuple[str, float]] = {
+    "accuracy":        (">=", 0.70),
+    "macro_f1":        (">=", 0.68),
+    "json_valid_rate": (">=", 0.95),
+    "avg_latency_ms":  ("<",  10_000),
+}
+
 
 def accuracy(y_true: Iterable[str], y_pred: Iterable[str]) -> float:
     y_true = list(y_true); y_pred = list(y_pred)
@@ -34,16 +42,30 @@ def confusion_counts(y_true: Iterable[str], y_pred: Iterable[str]) -> dict[str, 
     return dict(counts)
 
 
-def summarize_metrics(rows: list[dict]) -> dict[str, float]:
+def summarize_metrics(rows: list[dict]) -> dict:
     y_true = [r["label"] for r in rows]
     y_pred = [r["predicted_class"] for r in rows]
     json_valid = [r.get("json_valid", True) for r in rows]
     warnings = [bool(r.get("warning")) for r in rows]
-    return {
+
+    metrics: dict = {
         "n": len(rows),
         "accuracy": round(accuracy(y_true, y_pred), 4),
         "macro_f1": round(macro_f1(y_true, y_pred), 4),
         "json_valid_rate": round(sum(json_valid) / len(json_valid), 4) if rows else 0,
+        "avg_latency_ms": round(sum(r.get("latency_ms", 0) for r in rows) / len(rows)) if rows else 0,
         "warning_rate": round(sum(warnings) / len(warnings), 4) if rows else 0,
         "uncertain_rate": round(sum(p == "uncertain" for p in y_pred) / len(y_pred), 4) if rows else 0,
     }
+
+    def _pass(op: str, value: float, threshold: float) -> bool:
+        return value >= threshold if op == ">=" else value < threshold
+
+    targets_block = {}
+    for key, (op, threshold) in TARGETS.items():
+        value = metrics.get(key, 0)
+        targets_block[key] = {"threshold": threshold, "operator": op, "pass": _pass(op, value, threshold)}
+
+    metrics["targets"] = targets_block
+    metrics["all_targets_met"] = all(v["pass"] for v in targets_block.values())
+    return metrics
