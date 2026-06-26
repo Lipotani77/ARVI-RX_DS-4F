@@ -14,9 +14,15 @@ radiographie thoracique et renvoie un JSON. Suivez les étapes dans l'ordre.
 - **MedGemma est un modèle « gated »** sur Hugging Face : il faut un compte, accepter les conditions d'accès,
   et s'authentifier. Sans ça, le téléchargement échoue (étape 4).
 - **Le modèle est lourd** (~8 Go en bfloat16). Prévoyez :
-  - Idéalement un **GPU NVIDIA avec ≥ 8 Go de VRAM** (rapide).
-  - Sinon le **CPU** fonctionne aussi (auto-détecté par le code), mais c'est **lent** (plusieurs minutes par image).
+  - Idéalement un **GPU NVIDIA avec ≥ 8 Go de VRAM** (fp16, rapide, < 10 s/image).
+  - **Petit GPU (4–6 Go)** : le code charge automatiquement le modèle en **4‑bit** (~3 Go) pour qu'il tienne. Mesuré sur RTX 3050 4 Go : **~20 s/image** (au repos), plus lent si le GPU est partagé avec le bureau.
+  - Sinon le **CPU** fonctionne aussi (auto-détecté), mais c'est **très lent** : **~7–8 min par image** (mesuré sur i7‑12650H).
   - Au moins **~10 Go d'espace disque libre** pour le téléchargement des poids.
+
+> ⏱️ **Latence & objectif < 10 s** : voir l'analyse mesurée dans
+> [docs/latence_et_materiel.md](latence_et_materiel.md). En résumé, < 10 s avec le JSON
+> complet suppose un GPU ≥ 8 Go ; sur 4 Go on est à ~20 s, documenté comme limite matérielle.
+> Le 4‑bit requiert le paquet `bitsandbytes` (déjà dans `requirements.txt`).
 
 ---
 

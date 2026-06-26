@@ -43,4 +43,5 @@ Ne jamais stocker : nom, prénom, date de naissance, identifiant patient réel, 
 - Risque d'hallucination textuelle.
 - Confiance non automatiquement calibrée.
 - Sensibilité aux prompts et au modèle choisi.
+- **Latence dépendante du matériel** : la cible < 10 s suppose un GPU ≥ 8 Go ; sur GPU 4 Go (4‑bit) on mesure ~20 s/image, en CPU ~7–8 min. Voir [latence_et_materiel.md](latence_et_materiel.md).
 - Nécessité d'une validation indépendante pour tout usage réel.

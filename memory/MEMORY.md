@@ -1,0 +1,2 @@
+- [Python env](python-env.md) — pas de python sur le PATH ; utiliser l'interpréteur conda `arvi-rx`
+- [MedGemma VRAM](medgemma-vram-contention.md) — GPU 4 Go : un seul consommateur du modèle à la fois, sinon OSError 1455

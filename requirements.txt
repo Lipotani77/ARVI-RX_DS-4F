@@ -13,3 +13,4 @@ pydicom>=2.4
 transformers>=4.56
 accelerate>=0.34
 torch
+bitsandbytes>=0.43; platform_system != "Darwin"  # quantification 4-bit GPU (pas de wheels macOS)

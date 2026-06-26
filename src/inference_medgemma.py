@@ -1,13 +1,16 @@
 from pathlib import Path
 from typing import Any
-import json, re, torch
+import json, os, re, time, torch
 from PIL import Image
-from transformers import pipeline
+from transformers import pipeline, BitsAndBytesConfig
 
 _PIPE = None
-_PIPE_DEVICE = None
+_PIPE_KEY = None  # (device, précision CPU) → on recharge si la config change
 
-MIN_VRAM_BYTES = 8 * 1024 ** 3  # 8 Go minimum pour medgemma-4b en bfloat16
+# En bfloat16, medgemma-4b pèse ~8 Go → il faut un GPU avec ≥ 8 Go de VRAM.
+# En 4-bit (NF4), il tombe à ~3 Go → un petit GPU (ex. RTX 3050 4 Go) suffit.
+MIN_VRAM_BYTES_4BIT = int(3.2 * 1024 ** 3)
+
 
 def _resolve_device(device: str | None = None) -> str:
     """ Détermine le device à utiliser selon la config de la machine
@@ -16,17 +19,37 @@ def _resolve_device(device: str | None = None) -> str:
         device (str | None): "cuda", "cpu" ou None pour auto-détection
 
     Returns:
-        str: "cuda" si GPU disponible avec assez de VRAM, sinon "cpu"
+        str: "cuda" si GPU avec assez de VRAM pour le 4-bit, sinon "cpu"
     """
-    if device is None:
-        if torch.cuda.is_available():
-            free_vram, _ = torch.cuda.mem_get_info()
-            return "cuda" if free_vram >= MIN_VRAM_BYTES else "cpu"
-        return "cpu"
-    return device
+    if device is not None:
+        return device
+    if torch.cuda.is_available():
+        free_vram, _ = torch.cuda.mem_get_info()
+        return "cuda" if free_vram >= MIN_VRAM_BYTES_4BIT else "cpu"
+    return "cpu"
+
+
+def _cpu_precision() -> torch.dtype:
+    """ Précision des poids en mode CPU.
+
+    Par défaut bfloat16 (~8 Go, peu de bande passante mémoire). Mais les CPU Intel
+    sans unité bf16 native (ex. Alder Lake / i7-12650H) *émulent* le bf16 et sont
+    souvent plus rapides en float32 — au prix de ~16 Go de RAM. À activer seulement
+    si la RAM libre le permet, via la variable d'environnement
+    `ARVI_CPU_PRECISION=float32` (sinon risque de swap = très lent).
+
+    Returns:
+        torch.dtype: torch.float32 si demandé explicitement, sinon torch.bfloat16
+    """
+    pref = os.environ.get("ARVI_CPU_PRECISION", "bfloat16").lower()
+    return torch.float32 if pref in {"float32", "fp32"} else torch.bfloat16
+
 
 def _get_pipe(device: str | None = None):
     """ cette fonction permet de ne charger medgemma qu'une seule fois
+
+    GPU : quantification 4-bit (NF4) pour tenir dans un petit GPU.
+    CPU : bfloat16 par défaut (précision configurable, threads optionnels).
 
     Args:
         device (str | None, optional): "cuda" ou "cpu". None = auto-détection. Defaults to None.
@@ -34,19 +57,46 @@ def _get_pipe(device: str | None = None):
     Returns:
         object: objet pipeline de medgemma
     """
-    global _PIPE, _PIPE_DEVICE
-    resolved = _resolve_device(device) # on résout le device demandé
-    # on recharge si le pipeline n'existe pas ou si le device demandé a changé
-    if _PIPE is None or _PIPE_DEVICE != resolved:
-        # bfloat16 partout : ~2x moins de RAM que float32 (~8 Go au lieu de ~16 Go),
+    global _PIPE, _PIPE_KEY
+    resolved = _resolve_device(device)  # on résout le device demandé
+    key = (resolved, os.environ.get("ARVI_CPU_PRECISION", "bfloat16"))
+    # on recharge si le pipeline n'existe pas ou si la config a changé
+    if _PIPE is not None and _PIPE_KEY == key:
+        return _PIPE
+
+    if resolved == "cuda":
+        # 4-bit NF4 : ~3 Go de VRAM (au lieu de ~8 en bf16). Le calcul se fait en
+        # bfloat16, nativement géré par les GPU Ampere (RTX 30xx). double_quant
+        # grappille encore un peu de VRAM sur les constantes de quantification.
+        quant = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
         _PIPE = pipeline(
             "image-text-to-text",
             model="google/medgemma-4b-it",
-            torch_dtype=torch.bfloat16,
-            device=resolved,
-            model_kwargs={"low_cpu_mem_usage": True}, # low_cpu_mem_usage réduit le pic de mémoire pendant le chargement
+            model_kwargs={
+                "quantization_config": quant,
+                "device_map": "cuda",
+                "low_cpu_mem_usage": True,
+            },
         )
-        _PIPE_DEVICE = resolved
+    else:
+        # CPU : on peut limiter les threads aux cœurs physiques pour éviter la
+        # contention hyper-threading (à régler/mesurer via ARVI_CPU_THREADS).
+        threads = os.environ.get("ARVI_CPU_THREADS")
+        if threads:
+            torch.set_num_threads(int(threads))
+        _PIPE = pipeline(
+            "image-text-to-text",
+            model="google/medgemma-4b-it",
+            torch_dtype=_cpu_precision(),
+            device="cpu",
+            model_kwargs={"low_cpu_mem_usage": True},  # réduit le pic mémoire au chargement
+        )
+    _PIPE_KEY = key
     return _PIPE
 
 # ======================================================================================
@@ -92,12 +142,34 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
         ]},
     ]
     resolved = _resolve_device(device)
-    # en CPU on génère moins de tokens : plus rapide et moins de RAM sur les petits PC.
-    # Le JSON attendu reste court, 256 tokens suffisent largement.
-    max_new_tokens = 256 if resolved == "cpu" else 512
-    out = _get_pipe(device)(text=messages, max_new_tokens=max_new_tokens)
+    # La latence ≈ nb de tokens générés × coût/token. On plafonne donc la sortie :
+    # le JSON attendu est court. Plus bas en CPU (chaque token y coûte très cher).
+    max_new_tokens = 128 if resolved == "cuda" else 200
+
+    # On charge le pipeline AVANT de démarrer le chrono : le premier chargement
+    # (téléchargement + mise en mémoire des poids) est un coût unique de plusieurs
+    # minutes qui ne doit pas polluer la latence d'inférence *par image*.
+    pipe = _get_pipe(device)
+    start = time.perf_counter()
+    # IMPORTANT : les paramètres de génération doivent passer par `generate_kwargs`,
+    # sinon le pipeline les route vers le *processor* qui les ignore silencieusement.
+    # NB : on garde l'échantillonnage par défaut du modèle (la génération greedy
+    # forcée dégradait la validité du JSON sur les images de test). La reproductibilité
+    # déterministe sera traitée plus tard via le prompt (phase S3/S4), pas ici.
+    out = pipe(
+        text=messages,
+        generate_kwargs={"max_new_tokens": max_new_tokens},
+    )
+    latency_ms = int((time.perf_counter() - start) * 1000)
+
     raw = out[0]["generated_text"][-1]["content"]
-    return _coerce_json(raw)
+    result = _coerce_json(raw)
+    # Champs runtime attendus par le pipeline (cf. schéma JSON du projet et eval/).
+    backend = "cuda/4bit" if resolved == "cuda" else f"cpu/{_cpu_precision()}".replace("torch.", "")
+    result["model_name"] = f"google/medgemma-4b-it ({backend})"
+    result["prompt_version"] = f"{mode}_v1"
+    result["latency_ms"] = latency_ms
+    return result
 
 def _coerce_json(raw: str) -> dict[str, Any]:
     """ Cette fonction tente d'extraire un JSON valide de la sortie brute du modèle
