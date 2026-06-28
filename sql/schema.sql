@@ -38,3 +38,4 @@ CREATE TABLE IF NOT EXISTS evaluations (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(run_id) REFERENCES runs(id)
 );
+/*H*/
