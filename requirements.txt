@@ -10,7 +10,7 @@ scikit-learn>=1.5
 numpy>=1.26
 opencv-python>=4.10
 pydicom>=2.4
-transformers>=4.56
+transformers>=5.0  # API pipeline `dtype=` (remplace `torch_dtype=`, supprimé en v6)
 accelerate>=0.34
 torch
 bitsandbytes>=0.43; platform_system != "Darwin"  # quantification 4-bit GPU (pas de wheels macOS)

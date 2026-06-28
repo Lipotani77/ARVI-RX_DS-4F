@@ -43,7 +43,8 @@ Avant une soutenance, un push ou une livraison, lancer le contrôle court :
 
 ```bash
 pip install -r requirements-test.txt
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
+# Contrôle court (sans GPU, comme la CI) : exclut les tests `slow` (intégration MedGemma).
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -m "not slow"
 python -m compileall -q src api app eval finetuning tests
 python eval/run_evaluation.py --mode toy \
   --out-dir /tmp/assistant-radio-eval \
@@ -51,6 +52,36 @@ python eval/run_evaluation.py --mode toy \
 ```
 
 Ce smoke test vérifie la structure du dépôt, le contrat du dataset synthétique, le schéma de sortie, les garde-fous, l'API de démonstration, la compilation Python et l'évaluation jouet.
+
+Intégration MedGemma (machine avec GPU, `requirements.txt` complet). Le modèle n'est chargé **qu'une seule fois** pour les deux tests :
+
+```bash
+python -m pytest -q -m slow
+```
+
+### Évaluation avec le backend MedGemma
+
+Lancer l'évaluation en remplaçant l'inférence jouet par le vrai modèle
+`google/medgemma-4b-it` (modèle *gated* : `huggingface-cli login` + licence acceptée).
+Seul le mode `baseline` est défini côté MedGemma.
+
+Smoke rapide sur une seule image (vérifie toute la chaîne, une seule inférence) :
+
+```powershell
+& "$env:USERPROFILE\anaconda3\python.exe" eval/run_evaluation.py `
+  --backend medgemma --mode baseline --dataset rsna --limit 1
+```
+
+Évaluation sur un lot d'images RSNA (métriques exploitables) :
+
+```powershell
+& "$env:USERPROFILE\anaconda3\python.exe" eval/run_evaluation.py `
+  --backend medgemma --mode baseline --dataset rsna --limit 20
+```
+
+Forcer le device si besoin : ajouter `--device cpu` ou `--device cuda`.
+Sorties écrites dans `eval/outputs/` (`baseline_predictions.csv`,
+`baseline_metrics.json`, `before_after_summary.csv`) et base `medical_ai_evidence.sqlite`.
 
 ## API de démonstration
 

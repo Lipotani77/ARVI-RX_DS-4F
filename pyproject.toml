@@ -1,3 +1,6 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "slow: integration tests that load the real MedGemma model (heavy: GPU + ~8GB download)",
+]

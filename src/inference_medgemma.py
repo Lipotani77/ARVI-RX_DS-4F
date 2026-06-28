@@ -1,6 +1,11 @@
 from pathlib import Path
 from typing import Any
-import json, os, re, time, torch
+import json, os, re, time
+# Sous Anaconda (Windows), MKL et PyTorch embarquent chacun leur copie de
+# `libiomp5md.dll` → la 2e init du runtime OpenMP avorte le process (OMP: Error #15).
+# On autorise la coexistence AVANT d'importer torch (sinon trop tard).
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+import torch
 from PIL import Image
 from transformers import pipeline, BitsAndBytesConfig
 
@@ -91,7 +96,7 @@ def _get_pipe(device: str | None = None):
         _PIPE = pipeline(
             "image-text-to-text",
             model="google/medgemma-4b-it",
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             model_kwargs={
                 "device_map": "cuda",
                 "low_cpu_mem_usage": True,
@@ -125,7 +130,7 @@ def _get_pipe(device: str | None = None):
         _PIPE = pipeline(
             "image-text-to-text",
             model="google/medgemma-4b-it",
-            torch_dtype=cpu_dtype,
+            dtype=cpu_dtype,
             device="cpu",
             model_kwargs={"low_cpu_mem_usage": True},  # réduit le pic mémoire au chargement
         )
