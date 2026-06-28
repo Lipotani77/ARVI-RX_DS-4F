@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 from pathlib import Path
 import sys
+
+# Double runtime OpenMP (MKL + PyTorch) sous Anaconda → OMP: Error #15. On l'autorise
+# avant tout import de numpy/torch. Cf. note dans src/inference_medgemma.py.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import numpy as np
 from PIL import Image
