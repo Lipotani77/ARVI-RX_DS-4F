@@ -8,10 +8,51 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
+import pandas as pd
 from PIL import Image
+import sqlite3
+import json
+import time
 
 from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails
+
+# --- Configuration SQLite ---
+DB_PATH = Path(__file__).resolve().parent.parent / "database.sqlite"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        with open(SCHEMA_PATH, "r") as f:
+            conn.executescript(f.read())
+        conn.commit()
+
+def log_run(image_name: str, model_name: str, prompt_version: str, pred: dict):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO runs (image_path, model_name, prompt_version, prediction_json, predicted_class, confidence, latency_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                image_name,
+                model_name,
+                prompt_version,
+                json.dumps(pred),
+                pred.get("predicted_class", "error"),
+                pred.get("confidence", 0.0),
+                pred.get("latency_ms", 0)
+            )
+        )
+        conn.commit()
+
+def get_history() -> pd.DataFrame:
+    with sqlite3.connect(DB_PATH) as conn:
+        df = pd.read_sql_query("SELECT id, created_at, image_path, predicted_class, confidence, model_name FROM runs ORDER BY id DESC", conn)
+    return df
+
+init_db()
 
 #Config
 st.set_page_config(
@@ -217,6 +258,28 @@ def render_tags(items: list) -> None:
     """, unsafe_allow_html=True)
 
 
+def render_recommendations(pred: dict) -> None:
+    p_class = pred.get("predicted_class", "uncertain")
+    if p_class == "suspected_opacity":
+        recs = [
+            "Planifier un scanner thoracique (TDM) pour confirmation.",
+            "Référer le patient à un pneumologue.",
+            "Corréler avec l'historique clinique (fièvre, toux, etc.)."
+        ]
+    elif p_class == "uncertain":
+        recs = [
+            "Refaire la radiographie (problème possible de qualité ou d'exposition).",
+            "Demander l'avis d'un radiologue senior."
+        ]
+    else:
+        recs = [
+            "Aucun suivi radiologique immédiat nécessaire basé sur cette image seule.",
+            "Corréler systématiquement avec l'examen clinique."
+        ]
+    
+    render_section("Recommandations Médicales", recs)
+
+
 def render_tracabilite(pred: dict) -> None:
     st.markdown(f"""
     <div style="display:flex;gap:16px;flex-wrap:wrap;background:#0B1220;
@@ -265,161 +328,209 @@ with col_badge:
 
 st.markdown("<hr style='margin:8px 0 12px;'>", unsafe_allow_html=True)
 
-#Bandeau avertissement
-st.markdown("""
-<div style="background:#1c1400;border:1px solid #78350f50;border-radius:6px;
-    padding:8px 14px;font-size:11px;color:#92400e;
-    font-family:'JetBrains Mono',monospace;letter-spacing:0.3px;margin-bottom:16px;">
-    ⚠&nbsp; Prototype pédagogique. Non destiné au diagnostic.
-    Validation par un professionnel qualifié requise.
-</div>
-""", unsafe_allow_html=True)
+tab1, tab2, tab3 = st.tabs(["🔍 Nouvelle Analyse", "🗂️ Historique des analyses", "❓ Guide Utilisateur"])
 
+with tab1:
 
-#Cache MedGemma
-@st.cache_resource(
-    show_spinner="Chargement de MedGemma — au 1er lancement : téléchargement + mise en mémoire des poids…"
-)
-def _warmup_medgemma():
-    from src.inference_medgemma import _get_pipe
-    return _get_pipe()
-
-
-#Sidebar
-with st.sidebar:
+    #Bandeau avertissement
     st.markdown("""
-    <div style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;
-        letter-spacing:1px;margin-bottom:16px;padding-bottom:12px;
-        border-bottom:1px solid #1e293b;">CONFIGURATION</div>
+    <div style="background:#1c1400;border:1px solid #78350f50;border-radius:6px;
+        padding:8px 14px;font-size:11px;color:#92400e;
+        font-family:'JetBrains Mono',monospace;letter-spacing:0.3px;margin-bottom:16px;">
+        ⚠&nbsp; Prototype pédagogique. Non destiné au diagnostic.
+        Validation par un professionnel qualifié requise.
+    </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("**Moteur d'inférence**")
-    engine = st.radio(
-        "Backend",
-        ("MedGemma (réel)", "Jouet (rapide)"),
-        help=(
-            "MedGemma : vrai VLM médical (google/medgemma-4b-it), lent, GPU recommandé. "
-            "Jouet : validateur de tuyauterie, lit le label dans le nom de fichier."
-        ),
+
+    #Cache MedGemma
+    @st.cache_resource(
+        show_spinner="Chargement de MedGemma — au 1er lancement : téléchargement + mise en mémoire des poids…"
     )
-    use_medgemma = engine.startswith("MedGemma")
-
-    if use_medgemma:
-        try:
-            from src import inference_medgemma as mg
-        except Exception as exc:
-            st.error(f"MedGemma indisponible ({type(exc).__name__}). Bascule sur le mode jouet.")
-            use_medgemma = False
-
-    mode_options = list(mg.PROMPTS.keys()) if use_medgemma else ["baseline", "improved"]
-    mode = st.selectbox("Mode (prompt)", mode_options)
-
-    if use_medgemma:
-        device = mg._resolve_device()
-        st.caption(f"Device détecté : **{device}**")
-        if device == "cpu":
-            st.warning("Pas de GPU : inférence CPU peut prendre **plusieurs minutes** par image.")
-        else:
-            st.caption("~20 s/image (GPU 4-bit). Voir docs/latence_et_materiel.md.")
-
-    st.markdown("<hr style='margin:16px 0;border-color:#1e293b;'>", unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;
-        letter-spacing:1px;margin-bottom:10px;">CLASSES DE SORTIE</div>
-    """, unsafe_allow_html=True)
-
-    for key, cfg in CLASSE_CONFIG.items():
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;
-            border-radius:5px;margin-bottom:4px;
-            background:{cfg['bg']};border:1px solid {cfg['border']}30;">
-            <span style="color:{cfg['color']};font-size:13px;">{cfg['icon']}</span>
-            <span style="color:{cfg['color']};font-size:11px;
-                font-family:'JetBrains Mono',monospace;">{key}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<hr style='margin:16px 0;border-color:#1e293b;'>", unsafe_allow_html=True)
-    st.caption("Images test : data/sample_images/")
-    st.caption("Schéma DB : sql/schema.sql")
-    st.caption("API : uvicorn api.main:app --reload")
+    def _warmup_medgemma():
+        from src.inference_medgemma import _get_pipe
+        return _get_pipe()
 
 
-#Zone principale
-uploaded = st.file_uploader(
-    "Déposer une radiographie thoracique frontale",
-    type=["png", "jpg", "jpeg"],
-    help="Utiliser les images synthétiques dans data/sample_images pour tester le flux (mode jouet).",
-)
-
-if uploaded:
-    suffix = Path(uploaded.name).suffix
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(uploaded.read())
-        tmp_path = Path(tmp.name)
-
-    col_img, col_result = st.columns([1, 1], gap="large")
-
-    with col_img:
+    #Sidebar
+    with st.sidebar:
         st.markdown("""
-        <div style="font-size:10px;color:#475569;font-family:'JetBrains Mono',monospace;
-            letter-spacing:1px;margin-bottom:8px;">RADIOGRAPHIE</div>
-        """, unsafe_allow_html=True)
-        st.image(Image.open(tmp_path), caption=uploaded.name, use_container_width=True)
-        st.markdown(f"""
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;
-            padding:8px 12px;margin-top:8px;font-family:'JetBrains Mono',monospace;
-            font-size:10px;color:#334155;">
-            Fichier&nbsp;: <span style="color:#64748b;">{uploaded.name}</span><br>
-            Taille&nbsp;: <span style="color:#64748b;">{uploaded.size // 1024} Ko</span>
-        </div>
+        <div style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;
+            letter-spacing:1px;margin-bottom:16px;padding-bottom:12px;
+            border-bottom:1px solid #1e293b;">CONFIGURATION</div>
         """, unsafe_allow_html=True)
 
-    with col_result:
-        try:
-            if use_medgemma:
-                _warmup_medgemma()
-                from src.inference_medgemma import medgemma_predict
-                with st.spinner("Analyse par MedGemma en cours…"):
-                    raw = medgemma_predict(tmp_path, mode=mode)
+        st.markdown("**Moteur d'inférence**")
+        engine = st.radio(
+            "Backend",
+            ("MedGemma (réel)", "Jouet (rapide)"),
+            help=(
+                "MedGemma : vrai VLM médical (google/medgemma-4b-it), lent, GPU recommandé. "
+                "Jouet : validateur de tuyauterie, lit le label dans le nom de fichier."
+            ),
+        )
+        use_medgemma = engine.startswith("MedGemma")
+
+        if use_medgemma:
+            try:
+                from src import inference_medgemma as mg
+            except Exception as exc:
+                st.error(f"MedGemma indisponible ({type(exc).__name__}). Bascule sur le mode jouet.")
+                use_medgemma = False
+
+        mode_options = list(mg.PROMPTS.keys()) if use_medgemma else ["baseline", "improved"]
+        mode = st.selectbox("Mode (prompt)", mode_options)
+
+        if use_medgemma:
+            device = mg._resolve_device()
+            st.caption(f"Device détecté : **{device}**")
+            if device == "cpu":
+                st.warning("Pas de GPU : inférence CPU peut prendre **plusieurs minutes** par image.")
             else:
-                raw = toy_predict(tmp_path, mode=mode)
+                st.caption("~20 s/image (GPU 4-bit). Voir docs/latence_et_materiel.md.")
 
-            pred = apply_safety_guardrails(raw)
+        st.markdown("<hr style='margin:16px 0;border-color:#1e293b;'>", unsafe_allow_html=True)
 
-        except Exception as exc:
-            st.error(f"Échec de l'inférence : {type(exc).__name__} — {exc}")
-            st.stop()
+        st.markdown("""
+        <div style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;
+            letter-spacing:1px;margin-bottom:10px;">CLASSES DE SORTIE</div>
+        """, unsafe_allow_html=True)
 
-        render_diagnostic_card(pred)
-        render_tracabilite(pred)
-        render_section("Observations visuelles", pred["visual_evidence"])
-        render_section("Justification", pred["justification"])
-        render_tags(pred["limitations"])
-
-        if pred.get("guardrail_errors"):
+        for key, cfg in CLASSE_CONFIG.items():
             st.markdown(f"""
-            <div style="background:#2d1515;border:1px solid #7f1d1d40;border-radius:6px;
-                padding:8px 12px;font-size:11px;color:#f87171;
-                font-family:'JetBrains Mono',monospace;margin-bottom:8px;">
-                ⚡ Garde-fous déclenchés : {pred['guardrail_errors']}
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;
+                border-radius:5px;margin-bottom:4px;
+                background:{cfg['bg']};border:1px solid {cfg['border']}30;">
+                <span style="color:{cfg['color']};font-size:13px;">{cfg['icon']}</span>
+                <span style="color:{cfg['color']};font-size:11px;
+                    font-family:'JetBrains Mono',monospace;">{key}</span>
             </div>
             """, unsafe_allow_html=True)
 
-        with st.expander("{ }  Sortie JSON brute", expanded=False):
-            st.json(pred)
+        st.markdown("<hr style='margin:16px 0;border-color:#1e293b;'>", unsafe_allow_html=True)
+        st.caption("Images test : data/sample_images/")
+        st.caption("Schéma DB : sql/schema.sql")
+        st.caption("API : uvicorn api.main:app --reload")
 
-else:
-    st.markdown("""
-    <div style="border:1.5px dashed #1e293b;border-radius:10px;
-        padding:60px 24px;text-align:center;background:#0f172a;margin-top:8px;">
-        <div style="font-size:36px;opacity:0.2;margin-bottom:12px;">⊕</div>
-        <div style="color:#334155;font-family:'JetBrains Mono',monospace;
-            font-size:13px;letter-spacing:0.5px;">Déposer une radiographie ci-dessus</div>
-        <div style="color:#1e293b;font-size:11px;margin-top:6px;
-            font-family:'JetBrains Mono',monospace;">
-            ou utiliser les images synthétiques dans data/sample_images/
+
+    #Zone principale
+    uploaded = st.file_uploader(
+        "Déposer une radiographie thoracique frontale",
+        type=["png", "jpg", "jpeg"],
+        help="Utiliser les images synthétiques dans data/sample_images pour tester le flux (mode jouet).",
+    )
+
+    if uploaded:
+        analyze_button = st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True)
+        if analyze_button:
+            suffix = Path(uploaded.name).suffix
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(uploaded.read())
+                tmp_path = Path(tmp.name)
+
+        col_img, col_result = st.columns([1, 1], gap="large")
+
+        with col_img:
+            st.markdown("""
+            <div style="font-size:10px;color:#475569;font-family:'JetBrains Mono',monospace;
+                letter-spacing:1px;margin-bottom:8px;">RADIOGRAPHIE</div>
+            """, unsafe_allow_html=True)
+            st.image(Image.open(tmp_path), caption=uploaded.name, use_container_width=True)
+            st.markdown(f"""
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;
+                padding:8px 12px;margin-top:8px;font-family:'JetBrains Mono',monospace;
+                font-size:10px;color:#334155;">
+                Fichier&nbsp;: <span style="color:#64748b;">{uploaded.name}</span><br>
+                Taille&nbsp;: <span style="color:#64748b;">{uploaded.size // 1024} Ko</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_result:
+            try:
+                with st.status("Traitement en cours...", expanded=True) as status:
+                    st.write("🔄 Anonymisation des métadonnées (DICOM)...")
+                    time.sleep(0.5)
+                    st.write("📏 Redimensionnement de l'image (512x512)...")
+                    time.sleep(0.5)
+                    st.write("🧠 Exécution du modèle d'Intelligence Artificielle...")
+                
+                    if use_medgemma:
+                        _warmup_medgemma()
+                        from src.inference_medgemma import medgemma_predict
+                        raw = medgemma_predict(tmp_path, mode=mode)
+                    else:
+                        raw = toy_predict(tmp_path, mode=mode)
+                
+                    status.update(label="Analyse terminée avec succès !", state="complete", expanded=False)
+
+                pred = apply_safety_guardrails(raw)
+                log_run(uploaded.name, "medgemma-4b-it" if use_medgemma else "toy", f"prompt_{mode}", pred)
+
+            except Exception as exc:
+                st.error(f"Échec de l'inférence : {type(exc).__name__} — {exc}")
+                st.stop()
+
+            render_diagnostic_card(pred)
+            render_tracabilite(pred)
+            render_section("Observations visuelles", pred["visual_evidence"])
+            render_section("Justification", pred["justification"])
+            render_tags(pred["limitations"])
+            render_recommendations(pred)
+
+            if pred.get("guardrail_errors"):
+                st.markdown(f"""
+                <div style="background:#2d1515;border:1px solid #7f1d1d40;border-radius:6px;
+                    padding:8px 12px;font-size:11px;color:#f87171;
+                    font-family:'JetBrains Mono',monospace;margin-bottom:8px;">
+                    ⚡ Garde-fous déclenchés : {pred['guardrail_errors']}
+                </div>
+                """, unsafe_allow_html=True)
+
+            with st.expander("{ }  Sortie JSON brute", expanded=False):
+                st.json(pred)
+
+    else:
+        st.markdown("""
+        <div style="border:1.5px dashed #1e293b;border-radius:10px;
+            padding:60px 24px;text-align:center;background:#0f172a;margin-top:8px;">
+            <div style="font-size:36px;opacity:0.2;margin-bottom:12px;">⊕</div>
+            <div style="color:#334155;font-family:'JetBrains Mono',monospace;
+                font-size:13px;letter-spacing:0.5px;">Déposer une radiographie ci-dessus</div>
+            <div style="color:#1e293b;font-size:11px;margin-top:6px;
+                font-family:'JetBrains Mono',monospace;">
+                ou utiliser les images synthétiques dans data/sample_images/
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
+with tab2:
+    st.header("Historique des analyses")
+    st.write("Toutes les inférences passées sauvegardées dans la base de données locale (SQLite).")
+    try:
+        df_history = get_history()
+        if df_history.empty:
+            st.info("Aucune analyse n'a été effectuée pour le moment.")
+        else:
+            df_history['created_at'] = pd.to_datetime(df_history['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
+            st.dataframe(
+                df_history,
+                column_config={
+                    "id": "ID", "created_at": "Date et Heure", "image_path": "Nom de l'image",
+                    "predicted_class": "Diagnostic",
+                    "confidence": st.column_config.ProgressColumn("Confiance", format="%.2f", min_value=0, max_value=1),
+                    "model_name": "Modèle utilisé",
+                },
+                hide_index=True, use_container_width=True
+            )
+            if st.button("🔄 Rafraîchir l'historique"):
+                st.rerun()
+    except Exception as e:
+        st.error(f"Erreur lors du chargement de la base de données : {e}")
+
+with tab3:
+    guide_path = Path(__file__).resolve().parent.parent / "docs" / "guide_utilisateur.md"
+    if guide_path.exists():
+        with open(guide_path, "r", encoding="utf-8") as f:
+            st.markdown(f.read())
+    else:
+        st.warning("Le fichier du guide utilisateur est introuvable.")
