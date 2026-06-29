@@ -203,7 +203,13 @@ with tab1:
             conf = pred.get("confidence", 0.0)
             st.write(f"**Indice de confiance : {conf*100:.1f}%**")
             st.progress(float(conf))
-            
+
+            # Métriques simples de cette analyse (sans graphique)
+            m_col1, m_col2, m_col3 = st.columns(3)
+            m_col1.metric("Temps d'inférence", f"{pred.get('latency_ms', 0)} ms")
+            m_col2.metric("Confiance", f"{conf*100:.1f}%")
+            m_col3.metric("Qualité d'image", pred.get("image_quality", "—"))
+
             # Détails structurés (plus de JSON brut)
             with st.expander("📌 Preuves Visuelles", expanded=True):
                 evidences = _as_bullet_list(pred.get("visual_evidence"))
