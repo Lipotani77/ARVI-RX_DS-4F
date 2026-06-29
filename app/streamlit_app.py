@@ -39,6 +39,7 @@ def _as_bullet_list(value) -> list[str]:
 # --- Configuration SQLite ---
 DB_PATH = Path(__file__).resolve().parent.parent / "database.sqlite"
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
+EVAL_DIR = Path(__file__).resolve().parent.parent / "eval" / "outputs"
 
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
@@ -70,6 +71,30 @@ def get_history() -> pd.DataFrame:
     with sqlite3.connect(DB_PATH) as conn:
         df = pd.read_sql_query("SELECT id, created_at, image_path, predicted_class, confidence, model_name FROM runs ORDER BY id DESC", conn)
     return df
+
+def get_runs_df() -> pd.DataFrame:
+    """Récupère les colonnes utiles aux statistiques d'exécution (avec latence)."""
+    with sqlite3.connect(DB_PATH) as conn:
+        df = pd.read_sql_query(
+            "SELECT id, created_at, predicted_class, confidence, latency_ms, model_name "
+            "FROM runs ORDER BY id",
+            conn,
+        )
+    return df
+
+def load_eval_metrics(mode: str) -> dict | None:
+    """Lit eval/outputs/{mode}_metrics.json (déjà produit par run_evaluation.py).
+
+    Renvoie le dict de métriques (contenant le bloc `targets` + `all_targets_met`),
+    ou None si le fichier n'existe pas / est illisible.
+    """
+    path = EVAL_DIR / f"{mode}_metrics.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 # Initialiser la base au démarrage
 init_db()
@@ -105,7 +130,12 @@ with st.sidebar:
     mode = st.selectbox("Prompt utilisé", mode_options, index=0)
 
 # Création des onglets
-tab1, tab2, tab3 = st.tabs(["🔍 Nouvelle Analyse", "🗂️ Historique des analyses", "❓ Guide Utilisateur"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🔍 Nouvelle Analyse",
+    "🗂️ Historique des analyses",
+    "📊 Métriques",
+    "❓ Guide Utilisateur",
+])
 
 with tab1:
     st.header("Nouvelle Analyse")
@@ -252,6 +282,107 @@ with tab2:
         st.error(f"Erreur lors du chargement de la base de données : {e}")
 
 with tab3:
+    st.header("Métriques")
+
+    # --- Section A : métriques d'évaluation (jeu de test, vérité-terrain) ---
+    st.subheader("Métriques d'évaluation (jeu de test)")
+    st.caption(
+        "Calculées hors-ligne par `eval/run_evaluation.py` et lues depuis "
+        "`eval/outputs/`. Comparées aux objectifs du projet."
+    )
+
+    eval_mode = st.selectbox("Mode évalué", ["improved", "baseline"], index=0)
+    m = load_eval_metrics(eval_mode)
+
+    if m is None:
+        st.info(
+            "Aucun fichier de métriques trouvé pour ce mode. "
+            "Générez-les avec :\n\n"
+            "```bash\npython eval/run_evaluation.py --mode toy\n```"
+        )
+    else:
+        targets = m.get("targets", {})
+
+        def _target_caption(key: str) -> str:
+            t = targets.get(key)
+            if not t:
+                return ""
+            badge = "✅" if t.get("pass") else "❌"
+            return f"🎯 Objectif {t.get('operator', '')} {t.get('threshold', '')} {badge}"
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("Accuracy", f"{m.get('accuracy', 0):.2f}")
+            st.caption(_target_caption("accuracy"))
+        with c2:
+            st.metric("Macro-F1", f"{m.get('macro_f1', 0):.2f}")
+            st.caption(_target_caption("macro_f1"))
+        with c3:
+            st.metric("Latence moy. (ms)", f"{m.get('avg_latency_ms', 0)}")
+            st.caption(_target_caption("avg_latency_ms"))
+        with c4:
+            st.metric("JSON valide", f"{m.get('json_valid_rate', 0):.2f}")
+            st.caption(_target_caption("json_valid_rate"))
+
+        c5, c6, c7 = st.columns(3)
+        c5.metric("Nb. de cas", m.get("n", 0))
+        c6.metric("Taux d'avertissement", f"{m.get('warning_rate', 0):.2f}")
+        c7.metric("Taux 'uncertain'", f"{m.get('uncertain_rate', 0):.2f}")
+
+        if m.get("all_targets_met"):
+            st.success("✅ Tous les objectifs du projet sont atteints pour ce mode.")
+        else:
+            st.warning("⚠️ Certains objectifs du projet ne sont pas atteints.")
+
+        st.caption(
+            "ℹ️ Avec le backend *jouet*, la latence d'évaluation est ~0 ms "
+            "(inférence instantanée). La latence réaliste apparaît dans les "
+            "statistiques d'exécution ci-dessous."
+        )
+
+    st.divider()
+
+    # --- Section B : statistiques d'exécution live (database.sqlite) ---
+    st.subheader("Statistiques d'exécution (analyses de l'application)")
+    st.caption(
+        "Dérivées des prédictions réellement effectuées dans l'application "
+        "(pas de vérité-terrain → pas d'accuracy/F1 ici)."
+    )
+
+    df_runs = get_runs_df()
+    if df_runs.empty:
+        st.info("Aucune analyse enregistrée pour le moment. Lancez une analyse dans l'onglet « Nouvelle Analyse ».")
+    else:
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Analyses effectuées", len(df_runs))
+        k2.metric("Temps moyen / image (ms)", f"{df_runs['latency_ms'].mean():.0f}")
+        k3.metric("Confiance moyenne", f"{df_runs['confidence'].mean():.2f}")
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Distribution des classes prédites**")
+            st.bar_chart(df_runs["predicted_class"].value_counts())
+        with col_b:
+            st.markdown("**Répartition des confiances**")
+            bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+            labels = ["0–0.2", "0.2–0.4", "0.4–0.6", "0.6–0.8", "0.8–1.0"]
+            conf_binned = pd.cut(
+                df_runs["confidence"], bins=bins, labels=labels, include_lowest=True
+            )
+            st.bar_chart(conf_binned.value_counts().sort_index())
+
+        st.markdown("**Latence dans le temps (ms)**")
+        df_lat = df_runs.copy()
+        df_lat["created_at"] = pd.to_datetime(df_lat["created_at"])
+        st.line_chart(df_lat.set_index("created_at")["latency_ms"])
+
+        st.markdown("**Latence moyenne par modèle (ms)**")
+        st.bar_chart(df_runs.groupby("model_name")["latency_ms"].mean())
+
+        if st.button("🔄 Rafraîchir les métriques"):
+            st.rerun()
+
+with tab4:
     guide_path = Path(__file__).resolve().parent.parent / "docs" / "guide_utilisateur.md"
     if guide_path.exists():
         with open(guide_path, "r", encoding="utf-8") as f:
