@@ -18,6 +18,24 @@ from PIL import Image
 from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails
 
+def _as_bullet_list(value) -> list[str]:
+    """Normalise un champ JSON (liste OU chaîne) en liste de puces.
+
+    MedGemma renvoie parfois `visual_evidence`/`limitations` sous forme de
+    chaîne alors que le schéma attend une liste : itérer dessus afficherait
+    une puce par caractère. On enveloppe donc une chaîne dans une liste à un
+    seul élément.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, (list, tuple)):
+        return [str(v).strip() for v in value if str(v).strip()]
+    return [str(value)]
+
+
 # --- Configuration SQLite ---
 DB_PATH = Path(__file__).resolve().parent.parent / "database.sqlite"
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
@@ -158,15 +176,23 @@ with tab1:
             
             # Détails structurés (plus de JSON brut)
             with st.expander("📌 Preuves Visuelles", expanded=True):
-                for evidence in pred.get("visual_evidence", []):
-                    st.markdown(f"- {evidence}")
+                evidences = _as_bullet_list(pred.get("visual_evidence"))
+                if evidences:
+                    for evidence in evidences:
+                        st.markdown(f"- {evidence}")
+                else:
+                    st.caption("Aucune preuve visuelle fournie.")
                     
             with st.expander("📝 Justification Médicale", expanded=True):
                 st.write(pred.get("justification", "Aucune justification fournie."))
                 
             with st.expander("🛑 Limites de l'analyse", expanded=False):
-                for limit in pred.get("limitations", []):
-                    st.markdown(f"- {limit}")
+                limits = _as_bullet_list(pred.get("limitations"))
+                if limits:
+                    for limit in limits:
+                        st.markdown(f"- {limit}")
+                else:
+                    st.caption("Aucune limite renseignée.")
                     
             with st.expander("💡 Recommandations Médicales", expanded=True):
                 if p_class == "suspected_opacity":
