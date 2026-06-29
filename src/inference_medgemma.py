@@ -82,6 +82,13 @@ def _get_pipe(device: str | None = None):
             renvoie aussi device/précision pour éviter de les recalculer côté appelant.
     """
     global _PIPE, _PIPE_KEY
+    # Déjà chargé et aucun device explicitement imposé : on réutilise tel quel.
+    # (On ne re-déduit PAS le backend depuis la VRAM libre, qui a chuté après le
+    #  chargement — sinon la clé change et le modèle se recharge inutilement.)
+    if _PIPE is not None and device is None:
+        resolved, precision = _PIPE_KEY
+        return _PIPE, resolved, precision
+
     resolved = _resolve_device(device)  # on résout le device (cuda ou cpu) selon la config de la machine
     cpu_dtype = _cpu_precision() # on résout la précision côté CPU
     precision = _cuda_precision() if resolved == "cuda" else str(cpu_dtype).replace("torch.", "")
@@ -153,7 +160,16 @@ Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact
 {"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
 "confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
 En cas de doute, utilise la classe "uncertain".""",
-    # "improved": "...prompt renforcé : contrôle qualité image, pas d'invention, seuil d'incertitude..."
+    "improved": """Analyse cette radiographie thoracique frontale.
+Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
+{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
+"confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
+En cas de doute, utilise la classe "uncertain".""",
+    "advanced": """Analyse cette radiographie thoracique frontale.
+Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
+{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
+"confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
+En cas de doute, utilise la classe "uncertain"."""
 }
 
 # ======================================================================================

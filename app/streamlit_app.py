@@ -126,7 +126,7 @@ with tab1:
                 pred = apply_safety_guardrails(raw_pred)
                 
                 st.write("💾 Sauvegarde dans la base de données SQLite...")
-                log_run(uploaded.name, "medgemma-4b-it" if use_medgemma else "toy", f"prompt_{mode}", pred)
+                log_run(uploaded.name, pred.get("model_name", "toy"), f"prompt_{mode}", pred)
                 
                 status.update(label="Analyse terminée avec succès !", state="complete", expanded=False)
             except Exception as exc:
