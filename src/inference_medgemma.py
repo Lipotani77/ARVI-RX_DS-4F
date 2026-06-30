@@ -159,6 +159,7 @@ PROMPTS = {
 Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
 {"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
 "confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
+Chaque champ texte (visual_evidence, justification, limitations, warning) : 5 mots maximum.
 En cas de doute, utilise la classe "uncertain".""",
     "improved": """Analyse cette radiographie thoracique frontale.
 Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
@@ -171,6 +172,11 @@ Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact
 "confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
 En cas de doute, utilise la classe "uncertain"."""
 }
+
+# Plafond de tokens par mode : baseline cherche la vitesse maximale (sortie
+# courte, parfois tronquée → JSON parfois invalide, assumé) ; improved reste
+# généreux pour produire un JSON complet et valide. latence ≈ nb tokens générés.
+MAX_NEW_TOKENS = {"baseline": 96, "improved": 512, "advanced": 512}
 
 # ======================================================================================
 # pipeline de prédiction pour MedGemma
@@ -200,9 +206,10 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
     # minutes qui ne doit pas polluer la latence d'inférence *par image*. Le pipeline
     # nous renvoie aussi device/précision résolus → pas de recalcul redondant ensuite.
     pipe, resolved, precision = _get_pipe(device)
-    # La latence ≈ nb de tokens générés × coût/token. On plafonne donc la sortie :
-    # le JSON attendu est court. Plus bas en CPU (chaque token y coûte très cher).
-    max_new_tokens = 512
+    # La latence ≈ nb de tokens générés × coût/token. On plafonne donc la sortie,
+    # par mode : baseline serre fort (vitesse max, troncature/JSON invalide assumés),
+    # improved reste généreux (JSON complet et valide). Cf. MAX_NEW_TOKENS.
+    max_new_tokens = MAX_NEW_TOKENS.get(mode, 512)
 
     start = time.perf_counter()
     # IMPORTANT : les paramètres de génération doivent passer par `generate_kwargs`,
