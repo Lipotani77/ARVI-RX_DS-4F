@@ -110,6 +110,13 @@ def test_metrics_and_api_health_contract() -> None:
     assert metrics["n"] == 2
     assert metrics["json_valid_rate"] == 1.0
     assert metrics["warning_rate"] == 1.0
+    # Se/Sp binaires (positif = suspected_opacity) : le seul vrai positif a été
+    # prédit `uncertain` (manqué) → sensibilité 0 ; le seul vrai négatif est bon
+    # → spécificité 1.
+    assert metrics["sensitivity"] == 0.0
+    assert metrics["specificity"] == 1.0
+    assert metrics["confusion_matrix"]["suspected_opacity"]["uncertain"] == 1
+    assert metrics["confusion_matrix"]["normal"]["normal"] == 1
 
 
 def test_api_predict_preserves_uploaded_case_signal() -> None:

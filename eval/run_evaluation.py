@@ -19,7 +19,7 @@ sys.path.append(str(ROOT))
 
 from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails, validate_prediction
-from src.metrics import summarize_metrics
+from src.metrics import summarize_metrics, CLASSES
 from src.database import insert_run, init_db
 
 
@@ -56,6 +56,16 @@ def write_csv(path: Path, rows: list[dict]) -> None:
     with path.open('w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader(); w.writerows(rows)
+
+
+def write_confusion_csv(path: Path, matrix: dict[str, dict[str, int]],
+                        classes: list[str] = CLASSES) -> None:
+    """Écrit la matrice de confusion : lignes = vérité-terrain, colonnes = prédiction."""
+    with path.open('w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        w.writerow(['true\\pred', *classes])
+        for t in classes:
+            w.writerow([t, *(matrix[t][p] for p in classes)])
 
 
 def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
@@ -125,6 +135,7 @@ def main() -> None:
         rows, metrics = run(mode, args.db_path, cases, backend=args.backend, device=args.device)
         write_csv(out_dir / f'{mode}_predictions.csv', rows)
         (out_dir / f'{mode}_metrics.json').write_text(json.dumps(metrics, indent=2), encoding='utf-8')
+        write_confusion_csv(out_dir / f'{mode}_confusion_matrix.csv', metrics['confusion_matrix'])
         summary.append({'mode': mode, **metrics})
     write_csv(out_dir / 'before_after_summary.csv', summary)
     print(json.dumps(summary, indent=2))
