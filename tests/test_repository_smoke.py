@@ -98,6 +98,37 @@ def test_invalid_model_output_falls_back_to_uncertain() -> None:
     assert pred["guardrail_errors"]
 
 
+def test_guardrail_tolerates_string_limitations() -> None:
+    # MedGemma renvoie `limitations` en chaîne (cf. schéma des prompts). Le garde-fou
+    # ne doit pas présumer d'une liste et planter (regression : 'str' object has no
+    # attribute 'append').
+    pred = apply_safety_guardrails(
+        {"predicted_class": "diagnosis", "confidence": 0.99, "limitations": "vue frontale unique"}
+    )
+
+    assert pred["predicted_class"] == "uncertain"
+    assert "guardrail triggered" in pred["limitations"]
+    assert "vue frontale unique" in pred["limitations"]
+
+
+def test_guardrail_downgrades_on_french_low_quality() -> None:
+    # `image_quality` est en français côté MedGemma : "mauvaise" doit déclencher
+    # le repli sur `uncertain` au même titre que "poor"/"limited".
+    pred = apply_safety_guardrails(
+        {
+            "image_quality": "mauvaise",
+            "predicted_class": "normal",
+            "confidence": 0.3,
+            "visual_evidence": "x",
+            "justification": "x",
+            "limitations": "x",
+            "warning": "x",
+        }
+    )
+
+    assert pred["predicted_class"] == "uncertain"
+
+
 def test_metrics_and_api_health_contract() -> None:
     rows = [
         {"label": "normal", "predicted_class": "normal", "json_valid": True, "warning": WARNING_TEXT},

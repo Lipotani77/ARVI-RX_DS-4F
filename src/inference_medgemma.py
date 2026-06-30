@@ -9,6 +9,11 @@ import torch
 from PIL import Image
 from transformers import pipeline, BitsAndBytesConfig
 
+# Enum des classes autorisées : source unique de vérité, partagée avec le garde-fou
+# (src/guardrails.py). On normalise la classe prédite contre cet ensemble pour qu'un
+# « Normal » ou « suspected opacity » du modèle ne soit pas traité comme invalide.
+from src.guardrails import ALLOWED_CLASSES
+
 _PIPE = None
 _PIPE_KEY = None  # (device, précision CPU) → on recharge si la config change
 
@@ -152,31 +157,34 @@ SYSTEM = ("Tu es un assistant pédagogique d'analyse de radiographies thoracique
           "Tu n'es pas un dispositif médical.")
 
 
-# le paramètre 'mode' sert à comparer baseline vs prompt amélioré
-# le prompt cidessous est un prompt test
-PROMPTS = {
-    "baseline": """Analyse cette radiographie thoracique frontale.
-Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
-{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
-"confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
-Chaque champ texte (visual_evidence, justification, limitations, warning) : 5 mots maximum.
-En cas de doute, utilise la classe "uncertain".""",
-    "improved": """Analyse cette radiographie thoracique frontale.
-Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
-{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
-"confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
-En cas de doute, utilise la classe "uncertain".""",
-    "advanced": """Analyse cette radiographie thoracique frontale.
-Réponds UNIQUEMENT par un JSON valide, sans aucun texte autour, au format exact :
-{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain",
-"confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}
-En cas de doute, utilise la classe "uncertain"."""
+# Les prompts (un par mode) sont maintenus dans des fichiers .txt à part, sous
+# `prompts/`. On les charge à l'import pour que toute modification de ces fichiers
+# soit prise en compte sans toucher au code. Le module est dans `src/`, donc la
+# racine du dépôt = parents[1].
+_PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
+_PROMPT_FILES = {
+    "baseline": "baseline_prompt.txt",
+    "improved": "improved_prompt.txt",
+    "advanced": "advanced_prompt.txt",
 }
 
-# Plafond de tokens par mode : baseline cherche la vitesse maximale (sortie
-# courte, parfois tronquée → JSON parfois invalide, assumé) ; improved reste
-# généreux pour produire un JSON complet et valide. latence ≈ nb tokens générés.
-MAX_NEW_TOKENS = {"baseline": 96, "improved": 512, "advanced": 512}
+
+def _load_prompt(filename: str) -> str:
+    """Lit le contenu d'un fichier de prompt sous `prompts/`."""
+    return (_PROMPTS_DIR / filename).read_text(encoding="utf-8").strip()
+
+
+# le paramètre 'mode' sert à comparer baseline vs prompt amélioré
+PROMPTS = {mode: _load_prompt(fname) for mode, fname in _PROMPT_FILES.items()}
+
+# Plafond de tokens identique pour tous les modes : le schéma JSON (7 champs)
+# doit pouvoir se fermer entièrement quel que soit le prompt. En égalisant le
+# budget, l'écart de json_valid_rate / accuracy entre baseline et improved
+# mesure la qualité du PROMPT et non la troncature (un baseline trop serré
+# rendait le JSON systématiquement invalide, un artefact de budget, pas de
+# prompt). latence ≈ nb de tokens générés. Dict conservé pour permettre une
+# future modulation par mode si besoin.
+MAX_NEW_TOKENS = {"baseline": 512, "improved": 512, "advanced": 512}
 
 # ======================================================================================
 # pipeline de prédiction pour MedGemma
@@ -206,9 +214,10 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
     # minutes qui ne doit pas polluer la latence d'inférence *par image*. Le pipeline
     # nous renvoie aussi device/précision résolus → pas de recalcul redondant ensuite.
     pipe, resolved, precision = _get_pipe(device)
-    # La latence ≈ nb de tokens générés × coût/token. On plafonne donc la sortie,
-    # par mode : baseline serre fort (vitesse max, troncature/JSON invalide assumés),
-    # improved reste généreux (JSON complet et valide). Cf. MAX_NEW_TOKENS.
+    # La latence ≈ nb de tokens générés × coût/token. On plafonne la sortie au
+    # même budget pour tous les modes : le JSON (7 champs) doit avoir la place de
+    # se fermer, sinon json_valid_rate refléterait la troncature et non le prompt.
+    # Cf. MAX_NEW_TOKENS.
     max_new_tokens = MAX_NEW_TOKENS.get(mode, 512)
 
     start = time.perf_counter()
@@ -225,11 +234,12 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
 
     raw = out[0]["generated_text"][-1]["content"]
     result = _coerce_json(raw)
-    # json_valid = le modèle a-t-il produit un JSON parsable ? `_coerce_json` n'ajoute
-    # la clé `_raw` que sur son chemin de repli (parsing échoué) → marqueur fiable.
-    # Sans ce champ, summarize_metrics retombe sur son défaut True → json_valid_rate
-    # toujours à 1.0, aveugle aux sorties tronquées/non parsables.
-    result["json_valid"] = "_raw" not in result
+    # json_valid = le modèle a-t-il produit un JSON *réellement* parsable et complet ?
+    # `_coerce_json` pose `_json_valid` (booléen explicite) : il vaut False dès qu'on a dû
+    # récupérer la classe d'une sortie tronquée, même si la prédiction est correcte. Ainsi
+    # json_valid_rate expose la troncature (la bonne métrique) sans pour autant pénaliser
+    # l'accuracy (cf. récupération de la classe dans `_coerce_json`).
+    result["json_valid"] = result.pop("_json_valid", False)
     # Champs runtime attendus par le pipeline (cf. schéma JSON du projet et eval/).
     backend = f"{resolved}/{precision}"
     result["model_name"] = f"google/medgemma-4b-it ({backend})"
@@ -237,25 +247,100 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
     result["latency_ms"] = latency_ms
     return result
 
-def _coerce_json(raw: str) -> dict[str, Any]:
-    """ Cette fonction tente d'extraire un JSON valide de la sortie brute du modèle
+# Repli sentinelle quand la classe prédite est *réellement* irrécupérable (ni un objet
+# JSON parsable, ni même un `predicted_class` exploitable dans le texte tronqué).
+_UNPARSABLE = {
+    "image_quality": "mauvaise", "predicted_class": "uncertain", "confidence": 0.0,
+    "visual_evidence": "", "justification": "Sortie non parsable.",
+    "limitations": "JSON invalide renvoyé par le modèle.",
+    "warning": "Résultat non exploitable, relecture nécessaire.",
+}
 
-    Args:
-        raw (str): _description_
 
-    Returns:
-        dict[str, Any]: _description_
+def _normalize_class(value: Any) -> str | None:
+    """Normalise une classe prédite contre l'enum `ALLOWED_CLASSES`.
+
+    Tolère la casse et les séparateurs : « Normal », « suspected opacity »,
+    « suspected-opacity » → `normal` / `suspected_opacity`. Renvoie None si la
+    valeur ne correspond à aucune classe autorisée (→ le garde-fou prendra le relais).
     """
-    cleaned = re.sub(r"^```(?:json)?\s*\n?", "", raw.strip())
-    cleaned = re.sub(r"\n?```$", "", cleaned)
+    if not isinstance(value, str):
+        return None
+    key = re.sub(r"[\s\-]+", "_", value.strip().lower())
+    return key if key in ALLOWED_CLASSES else None
+
+
+def _salvage_fields(text: str) -> dict[str, Any]:
+    """Récupère les champs scalaires d'un objet JSON *tronqué* (sans accolade fermante).
+
+    Le plafond `MAX_NEW_TOKENS` coupe souvent la sortie avant le `}` final : `json.loads`
+    échoue alors complètement alors que `predicted_class` (2e champ du schéma) a déjà été
+    émis. On l'extrait par regex ciblée, avec `image_quality` et `confidence` (présents tôt
+    eux aussi) pour éviter que le garde-fou ne dégrade la prédiction. Les champs descriptifs
+    coupés en plein milieu ne sont pas récupérés (ils n'influent pas sur le scoring).
+    """
+    salvaged: dict[str, Any] = {}
+    mc = re.search(r'"predicted_class"\s*:\s*"([^"]+)"', text)
+    if mc:
+        salvaged["predicted_class"] = mc.group(1)
+    mq = re.search(r'"image_quality"\s*:\s*"([^"]*)"', text)
+    if mq:
+        salvaged["image_quality"] = mq.group(1)
+    mf = re.search(r'"confidence"\s*:\s*([0-9]*\.?[0-9]+)', text)
+    if mf:
+        try:
+            salvaged["confidence"] = float(mf.group(1))
+        except ValueError:
+            pass
+    return salvaged
+
+
+def _coerce_json(raw: str) -> dict[str, Any]:
+    """Extrait une prédiction exploitable de la sortie brute du modèle.
+
+    Parser durci : (1) strip des fences markdown, (2) parsing du 1er objet `{...}` bien
+    fermé, (3) à défaut — sortie tronquée — récupération ciblée des champs scalaires,
+    (4) normalisation de la classe contre l'enum, (5) repli sentinelle seulement si la
+    classe reste irrécupérable. Pose `_json_valid` (validité JSON *réelle*, False dès qu'on
+    a dû récupérer) pour que l'accuracy mesure le modèle et json_valid_rate la troncature.
+    """
+    # 1) Strip des fences markdown (```json ... ```), en tête comme en queue.
+    cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", raw.strip())
+    cleaned = re.sub(r"\n?```\s*$", "", cleaned)
+
+    # 2) Chemin nominal : 1er objet {...} bien fermé → json.loads.
+    data: dict[str, Any] = {}
+    json_ok = False
     m = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    try:
-        data = json.loads(m.group(0)) if m else {}
-    except (json.JSONDecodeError, AttributeError):
-        data = {}
-    if "predicted_class" not in data:   # contrat non respecté → garde-fou
-        return {"image_quality": "mauvaise", "predicted_class": "uncertain",
-                "confidence": 0.0, "visual_evidence": "", "justification": "Sortie non parsable.",
-                "limitations": "JSON invalide renvoyé par le modèle.",
-                "warning": "Résultat non exploitable, relecture nécessaire.", "_raw": raw}
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+            if isinstance(parsed, dict):
+                data = parsed
+                json_ok = True
+        except json.JSONDecodeError:
+            pass
+
+    # 3) Repli sur sortie tronquée : on complète depuis le texte brut sans écraser ce qui
+    #    a été parsé proprement. Champs descriptifs manquants → défauts (le scoring n'en
+    #    dépend pas ; ils servent juste à satisfaire le schéma du garde-fou).
+    if "predicted_class" not in data:
+        salvaged = _salvage_fields(cleaned)
+        if "predicted_class" in salvaged:
+            data = {**_UNPARSABLE, **salvaged, **data}
+
+    # 4) Normalisation de la classe contre l'enum, y compris sur le chemin nominal
+    #    (un JSON parfaitement valide peut contenir « Normal »).
+    norm = _normalize_class(data.get("predicted_class"))
+
+    # 5) Classe irrécupérable → repli sentinelle (le garde-fou forcera `uncertain`).
+    if norm is None:
+        return {**_UNPARSABLE, "_json_valid": False, "_raw": raw}
+
+    data["predicted_class"] = norm
+    # 6) Marqueur de validité JSON *réelle* : une sortie tronquée mais récupérée reste
+    #    invalide (visible dans json_valid_rate), même si la classe prédite est correcte.
+    data["_json_valid"] = json_ok
+    if not json_ok:
+        data["_raw"] = raw
     return data

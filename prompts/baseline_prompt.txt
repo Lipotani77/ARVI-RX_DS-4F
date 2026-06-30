@@ -1,12 +1,3 @@
-Analyze this chest X-ray and tell me if it shows a normal lung, a suspected opacity, or if you are uncertain.
-
-You need to output your answer in JSON format with these fields:
-- image_quality
-- predicted_class (normal, suspected_opacity, uncertain)
-- confidence
-- visual_evidence
-- justification
-- limitations
-- warning
-
-Please provide the analysis.
+Analyse cette radiographie thoracique frontale.
+Réponds par un JSON au format :
+{"image_quality":"bonne|moyenne|mauvaise","predicted_class":"normal|suspected_opacity|uncertain","confidence":0.0,"visual_evidence":"...","justification":"...","limitations":"...","warning":"..."}

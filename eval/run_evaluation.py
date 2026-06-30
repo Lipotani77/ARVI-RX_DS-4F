@@ -82,12 +82,17 @@ def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
         image_path = ROOT / case['image_path']
         pred = apply_safety_guardrails(predict(image_path))
         valid, errors = validate_prediction(pred)
+        # json_valid = schéma conforme ET JSON réellement parsable. Le parser MedGemma
+        # expose `json_valid` (False sur sortie tronquée même si la classe a été récupérée) :
+        # on le combine pour que json_valid_rate reflète la troncature, sans masquer le
+        # gain d'accuracy. Backend `toy` : pas de clé → défaut True → comportement inchangé.
+        json_valid = valid and pred.get('json_valid', True)
         row = {
             'case_id': case['case_id'],
             'label': case['label'],
             'predicted_class': pred['predicted_class'],
             'confidence': pred['confidence'],
-            'json_valid': valid,
+            'json_valid': json_valid,
             'warning': pred.get('warning', ''),
             'latency_ms': pred.get('latency_ms', 0),
             'guardrail_errors': ';'.join(errors),
@@ -100,7 +105,7 @@ def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', choices=['toy', 'baseline', 'improved'], default='toy')
+    parser.add_argument('--mode', choices=['toy', 'baseline', 'improved', 'advanced'], default='toy')
     parser.add_argument('--backend', choices=['toy', 'medgemma'], default='toy')
     parser.add_argument('--dataset', choices=['synthetic', 'rsna'], default='synthetic')
     parser.add_argument('--limit', type=int, default=20,
