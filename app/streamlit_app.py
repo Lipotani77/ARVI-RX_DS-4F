@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 import pandas as pd
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFilter
 import base64
 
 from src.inference import toy_predict
@@ -82,8 +82,8 @@ def _warmup_medgemma():
     from src.inference_medgemma import _get_pipe
     return _get_pipe()
 
-# --- Config & Style (Tech Dashboard) ---
-st.set_page_config(page_title="ARVI-RX Data Center", layout="wide")
+# --- Config & Style (Clair, Premium, Professionnel) ---
+st.set_page_config(page_title="ARVI-RX Pro", layout="wide")
 
 def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
@@ -93,49 +93,46 @@ LOGO_PATH = Path(__file__).resolve().parent.parent / "data" / "assets" / "logo.p
 
 st.markdown("""
 <style>
-/* Arrière-plan global Cyber/Data */
+/* Arrière-plan global Clair et Médical */
 .stApp {
-    background-color: #0b0f19;
-    color: #e2e8f0;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-family: 'Inter', -apple-system, sans-serif;
 }
-/* Cartes Sombre/Néon */
+/* Cartes Blanches Professionnelles */
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
-    background: #111827 !important;
-    border: 1px solid #1e293b !important;
-    border-radius: 4px !important;
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.05) !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
     padding: 24px !important;
 }
-/* Sidebar */
+/* Sidebar Blanche */
 [data-testid="stSidebar"] {
-    background-color: #090c15 !important;
-    border-right: 1px solid #1e293b !important;
+    background-color: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
 }
 [data-testid="stSidebar"] * {
-    color: #94a3b8 !important;
+    color: #334155 !important;
 }
-/* Boutons Tech */
+/* Boutons Bleus Médicaux (Doctolib style) */
 .stButton > button {
-    background: #0f172a !important;
-    color: #00d4ff !important;
-    border: 1px solid #00d4ff !important;
-    border-radius: 2px !important;
+    background: #0ea5e9 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 4px !important;
     font-weight: 600 !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    text-transform: uppercase;
-    letter-spacing: 1px;
     transition: all 0.2s ease !important;
 }
 .stButton > button:hover {
-    background: #00d4ff !important;
-    color: #090c15 !important;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5) !important;
+    background: #0284c7 !important;
+    box-shadow: 0 4px 6px rgba(14, 165, 233, 0.2) !important;
 }
-/* Titres */
-h1, h2, h3 { color: #f8fafc !important; font-weight: 700 !important; font-family: 'Inter', sans-serif !important; }
-/* Métriques */
-[data-testid="stMetricValue"] { color: #00d4ff !important; }
+/* Titres sombres pour la lisibilité */
+h1, h2, h3 { color: #0f172a !important; font-weight: 600 !important; }
+p, li { color: #334155 !important; }
+/* Métriques en bleu médical */
+[data-testid="stMetricValue"] { color: #0ea5e9 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -149,22 +146,22 @@ if not st.session_state["authenticated"]:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if LOGO_PATH.exists():
             b64_logo = get_base64_image(LOGO_PATH)
-            st.markdown(f'<div style="text-align: center;"><img src="data:image/png;base64,{b64_logo}" width="120" style="filter: drop-shadow(0 0 10px #00d4ff);"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align: center;"><img src="data:image/png;base64,{b64_logo}" width="160"></div>', unsafe_allow_html=True)
         
-        st.markdown('<h2 style="text-align: center; color: #f8fafc;">ARVI-RX Analytics Engine</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align: center; color: #00d4ff; font-family: monospace;">[RESTRICTED ACCESS - SYSTEM AUTHENTICATION REQUIRED]</p>', unsafe_allow_html=True)
+        st.markdown('<h2 style="text-align: center; color: #0f172a;">Système ARVI-RX Pro</h2>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align: center; color: #64748b;">Portail Médical Sécurisé - HDS</p>', unsafe_allow_html=True)
         
         with st.form("login_form"):
-            username = st.text_input("USER_ID")
-            password = st.text_input("AUTH_KEY", type="password")
-            submit = st.form_submit_button("INITIALIZE SECURE CONNECTION", use_container_width=True)
+            username = st.text_input("Identifiant Praticien")
+            password = st.text_input("Mot de passe", type="password")
+            submit = st.form_submit_button("Authentification", use_container_width=True)
             
             if submit:
                 if username == "efrei" and password == "jury2026":
                     st.session_state["authenticated"] = True
                     st.rerun()
                 else:
-                    st.error("[ERROR] ACCESS DENIED. INVALID CREDENTIALS.")
+                    st.error("Identifiants incorrects.")
     st.stop()
 
 # --- APPLICATION PRINCIPALE ---
@@ -172,50 +169,52 @@ if not st.session_state["authenticated"]:
 col_logo, col_title, col_user = st.columns([1, 4, 2])
 with col_logo:
     if LOGO_PATH.exists():
-        st.image(Image.open(LOGO_PATH), width=60)
+        st.image(Image.open(LOGO_PATH), width=80)
 with col_title:
-    st.markdown("<h2 style='margin-bottom:0;'>ARVI-RX Analytics Engine</h2>", unsafe_allow_html=True)
-    st.markdown("<span style='color:#00d4ff; font-family:monospace;'>VLM Diagnostic System [ONLINE]</span>", unsafe_allow_html=True)
+    st.title("Assistant Radiologue Virtuel")
+    st.markdown("*Module d'Analyse Thoracique Frontale*")
 with col_user:
-    st.info("DATA SCIENTIST : Lazzem\nENV : Production (HDS)")
+    st.info("Dr. Lazzem (Pneumologie)\nSession Sécurisée - HDS")
 
 # Sidebar
 with st.sidebar:
-    st.markdown("### SYSTEM CONFIG")
-    engine = st.radio("BACKEND INFERENCE", ["SIMULATOR (FAST)", "MEDGEMMA-4B (NATIVE)"])
-    use_medgemma = engine == "MEDGEMMA-4B (NATIVE)"
+    st.markdown("### Configuration (S4)")
+    engine = st.radio("Moteur d'inférence", ["Mode Jouet (Simulation)", "MedGemma (Inférence Locale)"])
+    use_medgemma = engine == "MedGemma (Inférence Locale)"
     if use_medgemma:
         try:
             from src import inference_medgemma as mg
         except Exception as exc:
-            st.error("MEDGEMMA ENGINE OFFLINE. FALLBACK TO SIMULATOR.")
+            st.error("Service MedGemma indisponible. Retour au mode simulation.")
             use_medgemma = False
     
     mode_options = ["advanced", "improved", "baseline"]
-    mode = st.selectbox("PROMPT INJECTION LAYER", mode_options, index=0)
+    mode = st.selectbox("Version du Prompt", mode_options, index=0)
     
     st.markdown("---")
-    if st.button("TERMINATE SESSION"):
+    if st.button("Fermer la session"):
         st.session_state["authenticated"] = False
         st.session_state.pop("current_analysis", None)
         st.rerun()
 
 # Onglets
-tab1, tab2, tab3 = st.tabs(["[INFERENCE PIPELINE]", "[DATA ANALYTICS DASHBOARD]", "[DOCUMENTATION]"])
+tab1, tab2, tab3 = st.tabs(["Nouveau Dossier Patient", "Tableau de Bord & Analytiques", "Manuel Utilisateur"])
 
 with tab1:
+    st.markdown("### Création d'une Inférence")
+    
     col_upload, col_settings = st.columns([2, 1])
     with col_upload:
-        uploaded = st.file_uploader("INPUT: X-RAY TENSOR (PNG, JPG)", type=["png", "jpg", "jpeg"])
+        uploaded = st.file_uploader("Importer le cliché radiographique (PNG, JPG)", type=["png", "jpg", "jpeg"])
     
-    analyze_button = st.button("EXECUTE VLM ANALYSIS", type="primary", disabled=not uploaded, use_container_width=True)
+    analyze_button = st.button("Lancer l'Analyse Médicale", type="primary", disabled=not uploaded, use_container_width=True)
 
     if uploaded and analyze_button:
-        st.session_state["patient_id"] = f"UUID-{uuid.uuid4().hex[:8].upper()}"
+        st.session_state["patient_id"] = f"PAT-{uuid.uuid4().hex[:6].upper()}"
         
-        # CONSOLE INGÉNIEUR TEMPS RÉEL
+        # Console de logs
         console_box = st.empty()
-        logs = "> INITIALIZING INFERENCE PIPELINE...\n"
+        logs = "[INFO] Initialisation du traitement sécurisé...\n"
         console_box.code(logs, language="bash")
         
         suffix = Path(uploaded.name).suffix
@@ -223,16 +222,15 @@ with tab1:
             tmp.write(uploaded.read())
             tmp_path = Path(tmp.name)
 
-        logs += "> [OK] TENSOR LOADED INTO MEMORY\n"
+        logs += "[OK] Image chargée.\n"
         console_box.code(logs, language="bash")
         time.sleep(0.3)
         
-        logs += f"> [WARN] STRIPPING DICOM METADATA FOR HDS COMPLIANCE... ID: {st.session_state['patient_id']}\n"
+        logs += f"[INFO] Anonymisation des métadonnées... ID Patient: {st.session_state['patient_id']}\n"
         console_box.code(logs, language="bash")
         time.sleep(0.3)
         
-        logs += f"> [INFO] LOADING VLM KERNEL : {'medgemma-4b-it' if use_medgemma else 'toy_simulator'}\n"
-        logs += f"> [INFO] INJECTING PROMPT : {mode}\n"
+        logs += f"[INFO] Inférence en cours ({'medgemma-4b' if use_medgemma else 'simulateur'}) avec prompt {mode}...\n"
         console_box.code(logs, language="bash")
         
         try:
@@ -245,19 +243,16 @@ with tab1:
                 raw_pred = toy_predict(tmp_path, mode=mode)
             latency = int((time.time() - start_time) * 1000)
             
-            logs += f"> [OK] INFERENCE COMPLETE. LATENCY: {latency}ms\n"
-            console_box.code(logs, language="bash")
-            
-            logs += "> [INFO] APPLYING SAFETY GUARDRAILS (JSON VALIDATION)...\n"
+            logs += f"[OK] Analyse terminée. Latence: {latency}ms\n"
             console_box.code(logs, language="bash")
             
             pred = apply_safety_guardrails(raw_pred)
             pred["latency_ms"] = latency
             
             if pred.get("guardrail_errors"):
-                logs += f"> [ERROR] GUARDRAIL TRIGGERED: {pred['guardrail_errors']}\n"
+                logs += f"[WARN] Guardrail déclenché : {pred['guardrail_errors']}\n"
             else:
-                logs += "> [OK] GUARDRAILS PASSED.\n"
+                logs += "[OK] Guardrails validés.\n"
             console_box.code(logs, language="bash")
             
             st.session_state["current_analysis"] = pred
@@ -266,7 +261,7 @@ with tab1:
             st.session_state["logs"] = logs
             
         except Exception as exc:
-            logs += f"\n> [FATAL EXCEPTION] {exc}"
+            logs += f"\n[ERREUR FATALE] {exc}"
             console_box.code(logs, language="bash")
             st.stop()
                 
@@ -275,91 +270,90 @@ with tab1:
         tmp_path = st.session_state["current_image_path"]
         patient_id = st.session_state["patient_id"]
         
-        with st.expander("TERMINAL CONSOLE (DEBUG)", expanded=False):
+        with st.expander("Voir les logs techniques de l'analyse (Debug)"):
             st.code(st.session_state.get("logs", ""), language="bash")
         
         st.markdown("---")
         col_img, col_res = st.columns([1, 1.5])
         
         with col_img:
-            # XAI Heatmap Toggle
-            show_heatmap = st.checkbox("Activer l'Explicabilité (XAI - Grad-CAM simulé)", value=False)
+            # Heatmap Explicabilité
+            show_heatmap = st.checkbox("Activer la vue Explicabilité (Heatmap XAI)", value=False)
             if show_heatmap:
                 img_to_show = generate_heatmap(tmp_path, pred.get("predicted_class", "uncertain"))
                 st.image(img_to_show, caption=f"Heatmap (Attention Mask) - {patient_id}", use_container_width=True)
             else:
-                st.image(Image.open(tmp_path), caption=f"Radio Source - {patient_id}", use_container_width=True)
+                st.image(Image.open(tmp_path), caption=f"Radiographie - {patient_id}", use_container_width=True)
             
         with col_res:
-            st.subheader("MODEL OUTPUT TENSOR")
+            st.subheader("Bilan Préliminaire (IA Assistée)")
             p_class = pred.get("predicted_class", "uncertain")
             if p_class == "normal":
-                st.success("[CLASS_ID: NORMAL] - No anomalies detected.")
+                st.success("Classification : NORMAL")
             elif p_class == "suspected_opacity":
-                st.error("[CLASS_ID: SUSPECTED_OPACITY] - High probability of infection.")
+                st.error("Classification : SUSPECTED OPACITY (Anomalie détectée)")
             else:
-                st.warning("[CLASS_ID: UNCERTAIN] - Insufficient data / poor quality.")
+                st.warning("Classification : UNCERTAIN (Examen non concluant)")
                 
             conf = pred.get("confidence", 0.0)
-            st.metric(label="CONFIDENCE SCORE", value=f"{conf*100:.1f}%")
+            st.metric(label="Indice de Confiance de l'IA", value=f"{conf*100:.1f}%")
             st.progress(float(conf))
             
-            st.json(pred, expanded=False)
+            with st.expander("Détails et JSON Brut"):
+                st.json(pred, expanded=False)
 
         st.markdown("---")
-        st.subheader("HUMAN-IN-THE-LOOP VALIDATION")
-        st.info("L'ingénieur/médecin doit valider ou corriger l'output du modèle avant l'insertion dans la base de données SQL.")
+        st.subheader("Validation Clinique et Compte-Rendu")
+        st.info("Relisez et corrigez le compte-rendu généré avant de l'enregistrer au dossier du patient.")
         
-        default_notes = f"Observation Modèle : {pred.get('justification', '')}\nConclusion Humaine : "
-        doctor_notes = st.text_area("Correction/Validation (Éditable)", value=default_notes, height=100)
+        default_notes = f"Observation : {pred.get('justification', '')}\nConclusion : {p_class.upper()}."
+        doctor_notes = st.text_area("Compte-Rendu Médical (Éditable)", value=default_notes, height=100)
         
-        if st.button("OVERRIDE & SAVE TO DATABASE", type="primary"):
+        if st.button("Signer et Enregistrer au Dossier Patient", type="primary"):
             log_run(patient_id, "medgemma-4b-it" if use_medgemma else "toy", f"prompt_{mode}", pred, doctor_notes)
-            st.success("DATA SAVED TO SQLITE DB SUCCESSFULLY.")
+            st.success("Le dossier a été sauvegardé avec succès.")
             del st.session_state["current_analysis"]
             st.rerun()
 
 with tab2:
-    st.markdown("### DATA ANALYTICS & MONITORING")
+    st.markdown("### Tableau de Bord et Performances")
     try:
         df_history = get_history()
         if df_history.empty:
-            st.info("NO DATA FOUND IN DB.")
+            st.info("Aucune donnée disponible.")
         else:
             df_history['created_at'] = pd.to_datetime(df_history['created_at'])
             
-            # --- METRICS ROW ---
+            # --- METRICS ---
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Total Inferences", len(df_history))
-            c2.metric("Avg Confidence", f"{(df_history['confidence'].mean()*100):.1f}%")
-            c3.metric("Avg Latency", f"{df_history['latency_ms'].mean():.0f} ms")
+            c1.metric("Analyses Totales", len(df_history))
+            c2.metric("Confiance Moyenne", f"{(df_history['confidence'].mean()*100):.1f}%")
+            c3.metric("Latence Moyenne", f"{df_history['latency_ms'].mean():.0f} ms")
             error_rate = len(df_history[df_history['predicted_class'] == 'uncertain']) / len(df_history) * 100
-            c4.metric("Uncertainty Rate", f"{error_rate:.1f}%")
+            c4.metric("Taux d'Incertitude", f"{error_rate:.1f}%")
             
             st.markdown("---")
-            # --- CHARTS ---
             col_chart1, col_chart2 = st.columns(2)
             with col_chart1:
-                st.markdown("**Distribution des Diagnostics (Classes)**")
+                st.markdown("**Répartition des Diagnostics**")
                 class_counts = df_history['predicted_class'].value_counts()
-                st.bar_chart(class_counts, color="#00d4ff")
+                st.bar_chart(class_counts, color="#0ea5e9")
                 
             with col_chart2:
-                st.markdown("**Évolution de la Latence (ms)**")
-                # Trier par date pour la courbe
+                st.markdown("**Temps de réponse (ms)**")
                 df_time = df_history.sort_values('created_at').set_index('created_at')
-                st.line_chart(df_time['latency_ms'], color="#a855f7")
+                st.line_chart(df_time['latency_ms'], color="#0ea5e9")
 
             st.markdown("---")
-            st.markdown("**RAW SQL DATA (runs table)**")
+            st.markdown("**Base de Données Complète**")
             df_display = df_history.copy()
-            df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            df_display['created_at'] = df_display['created_at'].dt.strftime('%d/%m/%Y %H:%M')
             st.dataframe(df_display, hide_index=True, use_container_width=True)
             
-            if st.button("REFRESH DATABASE"):
+            if st.button("Actualiser les données"):
                 st.rerun()
     except Exception as e:
-        st.error(f"SQL QUERY ERROR : {e}")
+        st.error(f"Erreur SQL : {e}")
 
 with tab3:
     guide_path = Path(__file__).resolve().parent.parent / "docs" / "guide_utilisateur.md"
@@ -367,4 +361,4 @@ with tab3:
         with open(guide_path, "r", encoding="utf-8") as f:
             st.markdown(f.read())
     else:
-        st.warning("404 NOT FOUND")
+        st.warning("Document introuvable.")
