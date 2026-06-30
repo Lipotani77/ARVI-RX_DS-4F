@@ -57,7 +57,7 @@ def _warmup_medgemma():
     from src.inference_medgemma import _get_pipe
     return _get_pipe()
 
-# --- Config & Style (High-Tech Clair / Bleu Cyan) ---
+# --- Config & Style (ULTRA-PREMIUM, LOGO COLORS) ---
 st.set_page_config(page_title="ARVI-RX Intelligence", layout="wide")
 
 def get_base64_image(image_path):
@@ -68,57 +68,99 @@ LOGO_PATH = Path(__file__).resolve().parent.parent / "data" / "assets" / "logo.p
 
 st.markdown("""
 <style>
-/* Arrière-plan Clair High-Tech avec Gradient */
+/* Animations originales */
+@keyframes gradient-xy {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+@keyframes pulse-border {
+    0% { box-shadow: 0 0 0 0 rgba(0, 206, 209, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 206, 209, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 206, 209, 0); }
+}
+
+/* Arrière-plan Animé "Mesh Gradient" (Blanc / Teal / Cyan très doux) */
 .stApp {
-    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-    color: #1e293b;
+    background: linear-gradient(-45deg, #ffffff, #f0fdfa, #e0f2fe, #ffffff);
+    background-size: 400% 400%;
+    animation: gradient-xy 15s ease infinite;
+    color: #0f172a;
     font-family: 'Inter', -apple-system, sans-serif;
 }
-/* Cartes Glassmorphism Clair avec Bordure Cyan */
+
+/* Cartes (Glassmorphism ultra-poussé avec les couleurs du logo) */
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
-    background: rgba(255, 255, 255, 0.8) !important;
-    backdrop-filter: blur(12px) !important;
-    border-top: 3px solid #00a8ff !important;
-    border-radius: 8px !important;
-    box-shadow: 0 10px 30px rgba(0, 168, 255, 0.08) !important;
-    padding: 24px !important;
-    transition: transform 0.3s ease;
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(20px) !important;
+    border-left: 4px solid #00ced1 !important; /* Couleur Teal du logo */
+    border-top: 1px solid rgba(255,255,255,0.8) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 35px rgba(0, 31, 63, 0.05), 0 5px 15px rgba(0, 206, 209, 0.08) !important;
+    padding: 30px !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(0, 168, 255, 0.12) !important;
+    transform: translateY(-5px);
+    box-shadow: 0 25px 45px rgba(0, 31, 63, 0.08), 0 10px 20px rgba(0, 206, 209, 0.15) !important;
 }
-/* Sidebar Moderne */
+
+/* Sidebar élégante bleu marine profond (du logo) */
 [data-testid="stSidebar"] {
-    background-color: #ffffff !important;
-    border-right: 1px solid #e2e8f0 !important;
-    box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
+    background: linear-gradient(180deg, #001F3F 0%, #0f172a 100%) !important;
 }
 [data-testid="stSidebar"] * {
-    color: #334155 !important;
+    color: #f8fafc !important;
 }
-/* Boutons Interactifs Cyan */
+[data-testid="stSidebar"] .stRadio label, [data-testid="stSidebar"] .stSelectbox label {
+    color: #00ced1 !important; /* Accents Cyan */
+}
+
+/* Boutons d'Action (Originaux et vibrants) */
 .stButton > button {
-    background: linear-gradient(90deg, #00a8ff 0%, #0097e6 100%) !important;
+    background: linear-gradient(135deg, #001F3F 0%, #008080 50%, #00ced1 100%) !important;
+    background-size: 200% auto !important;
     color: #ffffff !important;
     border: none !important;
-    border-radius: 30px !important; /* Bouton Pilule très moderne */
+    border-radius: 30px !important;
     font-weight: 700 !important;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 15px rgba(0, 168, 255, 0.4) !important;
-    transition: all 0.3s ease !important;
+    letter-spacing: 1px;
+    box-shadow: 0 8px 20px rgba(0, 128, 128, 0.3) !important;
+    transition: 0.5s !important;
 }
 .stButton > button:hover {
-    box-shadow: 0 6px 20px rgba(0, 168, 255, 0.6) !important;
-    transform: scale(1.02) !important;
+    background-position: right center !important;
+    box-shadow: 0 12px 25px rgba(0, 206, 209, 0.5) !important;
+    transform: scale(1.05) !important;
 }
-/* Titres */
-h1, h2, h3 { color: #0f172a !important; font-weight: 800 !important; letter-spacing: -0.5px; }
+
+/* Bouton principal clignotant (Upload) */
+[data-testid="stFileUploader"] section {
+    border: 2px dashed #00ced1 !important;
+    border-radius: 16px !important;
+    background-color: rgba(240, 253, 250, 0.5) !important;
+    animation: pulse-border 3s infinite;
+}
+
+/* Onglets en style 'Pillules' (Très original) */
+[data-testid="stTabs"] button {
+    background-color: rgba(255,255,255,0.5) !important;
+    border-radius: 20px !important;
+    margin-right: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #001F3F !important;
+}
+[data-testid="stTabs"] button[aria-selected="true"] {
+    background-color: #001F3F !important;
+    color: white !important;
+    border: 1px solid #001F3F !important;
+}
+
+/* Titres avec la couleur Navy du logo */
+h1, h2, h3 { color: #001F3F !important; font-weight: 800 !important; letter-spacing: -0.5px; }
 /* KPIs & Métriques */
-[data-testid="stMetricValue"] { color: #00a8ff !important; text-shadow: 0 0 10px rgba(0, 168, 255, 0.2); }
-/* Inputs */
-input, textarea { border-radius: 8px !important; border: 1px solid #cbd5e1 !important; }
-input:focus, textarea:focus { border-color: #00a8ff !important; box-shadow: 0 0 0 2px rgba(0, 168, 255, 0.2) !important; }
+[data-testid="stMetricValue"] { color: #008080 !important; font-size: 2.5rem !important; font-weight: 900 !important;}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,22 +174,22 @@ if not st.session_state["authenticated"]:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if LOGO_PATH.exists():
             b64_logo = get_base64_image(LOGO_PATH)
-            st.markdown(f'<div style="text-align: center;"><img src="data:image/png;base64,{b64_logo}" width="150" style="filter: drop-shadow(0 4px 6px rgba(0,168,255,0.3));"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align: center;"><img src="data:image/png;base64,{b64_logo}" width="180" style="filter: drop-shadow(0 10px 15px rgba(0,206,209,0.3));"></div>', unsafe_allow_html=True)
         
-        st.markdown('<h2 style="text-align: center; color: #0f172a;">ARVI-RX Intelligence</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align: center; color: #64748b;">Portail Clinique Haute Technologie</p>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align: center; color: #001F3F; font-weight: 900;">ARVI-RX</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align: center; color: #008080; font-weight: bold; letter-spacing: 2px;">VLM INTELLIGENCE MEDICALE</p>', unsafe_allow_html=True)
         
         with st.form("login_form"):
-            username = st.text_input("Identifiant Praticien (ID Sécurisé)")
-            password = st.text_input("Clé d'accès biométrique (Mot de passe)", type="password")
-            submit = st.form_submit_button("Ouvrir la session sécurisée", use_container_width=True)
+            username = st.text_input("Identifiant Médecin")
+            password = st.text_input("Mot de passe", type="password")
+            submit = st.form_submit_button("DÉVERROUILLER LE TERMINAL", use_container_width=True)
             
             if submit:
                 if username == "efrei" and password == "jury2026":
                     st.session_state["authenticated"] = True
                     st.rerun()
                 else:
-                    st.error("Authentification échouée. Veuillez réessayer.")
+                    st.error("Accès refusé.")
     st.stop()
 
 # --- APPLICATION PRINCIPALE ---
@@ -155,17 +197,19 @@ if not st.session_state["authenticated"]:
 col_logo, col_title, col_user = st.columns([1, 4, 2])
 with col_logo:
     if LOGO_PATH.exists():
-        st.image(Image.open(LOGO_PATH), width=70)
+        st.image(Image.open(LOGO_PATH), width=90)
 with col_title:
-    st.markdown("<h2 style='margin-bottom:0;'>ARVI-RX Intelligence</h2>", unsafe_allow_html=True)
-    st.markdown("<span style='color:#00a8ff; font-weight:600;'>Module VLM Thoracique Frontal</span>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-bottom:0;'>Console d'Intelligence Diagnostique</h2>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#008080; font-weight:700; letter-spacing: 1px;'>MOTEUR D'INFERENCE THORACIQUE</span>", unsafe_allow_html=True)
 with col_user:
-    st.info("👤 **Dr. Moreau**\nService d'Imagerie de Pointe")
+    st.info("⚕️ **Dr. Moreau**\nSession : Active (HDS)")
 
 # Sidebar
 with st.sidebar:
-    st.markdown("### Contrôle Système")
-    engine = st.radio("Cœur d'IA (Backend)", ["Simulateur Haute-Vitesse", "MedGemma 4B (Local)"])
+    if LOGO_PATH.exists():
+        st.image(Image.open(LOGO_PATH), width=150)
+    st.markdown("### Contrôles Système")
+    engine = st.radio("Cœur IA", ["Simulateur Haute-Vitesse", "MedGemma 4B (Local)"])
     use_medgemma = engine == "MedGemma 4B (Local)"
     if use_medgemma:
         try:
@@ -174,46 +218,41 @@ with st.sidebar:
             st.error("Serveur MedGemma injoignable. Passage en simulation.")
             use_medgemma = False
     
-    mode = st.selectbox("Algorithme de Prompting", ["advanced", "improved", "baseline"], index=0)
+    mode = st.selectbox("Injection de Prompt", ["advanced", "improved", "baseline"], index=0)
     
     st.markdown("---")
-    if st.button("Verrouiller la session"):
+    if st.button("DÉCONNEXION SÉCURISÉE"):
         st.session_state["authenticated"] = False
         st.session_state.pop("current_analysis", None)
         st.rerun()
 
 # Onglets
-tab1, tab2, tab3 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation Produit"])
+tab1, tab2, tab3 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation Technique"])
 
 with tab1:
     col_upload, col_context = st.columns([2, 1])
     with col_upload:
-        uploaded = st.file_uploader("Importer une plaque radiographique (DICOM simulé, PNG, JPG)", type=["png", "jpg", "jpeg"])
+        uploaded = st.file_uploader("📥 Déposer le scan thoracique", type=["png", "jpg", "jpeg"])
     
     with col_context:
-        st.markdown("##### Paramètres Cliniques")
+        st.markdown("##### 🧬 Contexte Patient")
         if uploaded:
-            st.info(f"**Patient ID:** PAT-{uuid.uuid4().hex[:6].upper()}\n\n"
+            st.success(f"**ID:** PAT-{uuid.uuid4().hex[:6].upper()}\n\n"
                     f"**Âge:** {random.randint(35, 75)} ans\n\n"
-                    f"**Statut:** {'Fumeur' if random.choice([True, False]) else 'Non-fumeur'}\n\n"
+                    f"**Fumeur:** {'Oui' if random.choice([True, False]) else 'Non'}\n\n"
                     f"**Température:** {round(random.uniform(36.5, 39.5), 1)}°C")
         else:
-            st.write("En attente d'un cliché pour synchroniser le dossier patient...")
+            st.warning("En attente d'une radiographie...")
 
-    analyze_button = st.button("Lancer le diagnostic assisté par IA", type="primary", disabled=not uploaded, use_container_width=True)
+    analyze_button = st.button("LANCER LE DIAGNOSTIC IA", type="primary", disabled=not uploaded, use_container_width=True)
 
     if uploaded and analyze_button:
         st.session_state["patient_id"] = f"PAT-{uuid.uuid4().hex[:6].upper()}"
-        with st.status("Algorithmes en cours d'exécution...", expanded=True) as status:
+        with st.status("Traitement algorithmique...", expanded=True) as status:
             suffix = Path(uploaded.name).suffix
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(uploaded.read())
                 tmp_path = Path(tmp.name)
-
-            st.write("Extraction des contours et calibration...")
-            time.sleep(0.4)
-            st.write("Recherche d'opacités thoraciques (VLM)...")
-            time.sleep(0.4)
             
             try:
                 start_time = time.time()
@@ -243,16 +282,16 @@ with tab1:
         patient_id = st.session_state["patient_id"]
         
         st.markdown("---")
-        st.markdown("### Espace de Travail Radiologique (Outils PACS)")
+        st.markdown("### 🎛️ Terminal de Radiologie Interactif (PACS)")
         
         col_img, col_tools, col_res = st.columns([1.5, 1, 1.5])
         
         # Outils Interactifs d'imagerie
         with col_tools:
-            st.markdown("##### Outils d'Imagerie")
+            st.markdown("##### Filtres Optiques")
             brightness = st.slider("Luminosité", 0.5, 2.0, 1.0, 0.1)
             contrast = st.slider("Contraste", 0.5, 2.0, 1.0, 0.1)
-            show_heatmap = st.checkbox("Filtre d'Explicabilité (IA)")
+            show_heatmap = st.checkbox("🔮 Activer le Radar XAI (Heatmap)", value=True)
             
             # Traitement de l'image
             original_img = Image.open(tmp_path).convert("RGB")
@@ -262,63 +301,62 @@ with tab1:
             img_final = enhancer_c.enhance(contrast)
             
             if show_heatmap:
-                # Création rapide de Heatmap
                 overlay = Image.new("RGBA", img_final.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(overlay)
                 w, h = img_final.size
                 if pred.get("predicted_class") == "suspected_opacity":
-                    draw.ellipse((w//3, h//3, 2*w//3, 2*h//3), fill=(0, 168, 255, 90)) # Cyan glow
-                    overlay = overlay.filter(ImageFilter.GaussianBlur(30))
+                    # Gradient cyan/teal très stylisé pour coller aux couleurs du logo
+                    draw.ellipse((w//3, h//3, 2*w//3, 2*h//3), fill=(0, 206, 209, 110))
+                    overlay = overlay.filter(ImageFilter.GaussianBlur(35))
                 else:
-                    draw.rectangle((10, 10, w-10, h-10), outline=(0, 255, 0, 80), width=4)
+                    draw.rectangle((10, 10, w-10, h-10), outline=(0, 128, 128, 90), width=6)
                 img_final = Image.alpha_composite(img_final.convert("RGBA"), overlay).convert("RGB")
 
         with col_img:
-            st.image(img_final, caption=f"Patient : {patient_id}", use_container_width=True)
+            st.image(img_final, caption=f"Analyse Visuelle - {patient_id}", use_container_width=True)
             
         with col_res:
-            st.markdown("##### Rapport Préliminaire IA")
+            st.markdown("##### Bilan de l'Intelligence Artificielle")
             p_class = pred.get("predicted_class", "uncertain")
             if p_class == "normal":
-                st.success("✅ Résultat : NORMAL (Poumons clairs)")
+                st.info("✅ DIAGNOSTIC : NORMAL (Aucune opacité majeure)")
             elif p_class == "suspected_opacity":
-                st.error("⚠️ Résultat : SUSPECTED OPACITY (Anomalie)")
+                st.error("🚨 DIAGNOSTIC : SUSPECTED OPACITY (Anomalie détectée)")
             else:
-                st.warning("❔ Résultat : UNCERTAIN (Examen à refaire)")
+                st.warning("❔ DIAGNOSTIC : UNCERTAIN (Examen non concluant)")
                 
             conf = pred.get("confidence", 0.0)
-            st.metric(label="Précision estimée par l'algorithme", value=f"{conf*100:.1f}%")
+            st.metric(label="Confiance de la Prédiction", value=f"{conf*100:.1f}%")
             st.progress(float(conf))
             
-            with st.expander("Justification Clinique"):
+            with st.expander("Justification Algorithmique"):
                 st.write(pred.get("justification", "Non fourni."))
 
         st.markdown("---")
-        st.subheader("Finalisation du Rapport")
-        st.info("Le médecin doit corriger ce brouillon avant validation et export.")
+        st.subheader("Validation Clinique et Export")
+        st.info("L'IA assiste, mais le médecin signe. Corrigez le rapport avant de l'ajouter à la base de données de l'hôpital.")
         
-        default_notes = f"Radiographie {patient_id}.\nConstat de l'IA : {pred.get('justification', '')}\nDiagnostic validé : {p_class.upper()}."
-        doctor_notes = st.text_area("Éditeur de Compte-Rendu", value=default_notes, height=120)
+        default_notes = f"Patient {patient_id}.\n\nRelevé du système ARVI-RX :\n{pred.get('justification', '')}\n\nDiagnostic retenu par le praticien : {p_class.upper()}."
+        doctor_notes = st.text_area("Compte-Rendu Officiel", value=default_notes, height=130)
         
         col_save, col_export = st.columns([1, 1])
         with col_save:
-            if st.button("Enregistrer au dossier système", type="primary", use_container_width=True):
+            if st.button("VALIDER ET ENREGISTRER", type="primary", use_container_width=True):
                 log_run(patient_id, "medgemma-4b-it" if use_medgemma else "toy", f"prompt_{mode}", pred, doctor_notes)
-                st.success("Données synchronisées avec la base SQLite.")
+                st.success("Dossier sauvegardé dans le cloud sécurisé de l'hôpital.")
                 del st.session_state["current_analysis"]
                 st.rerun()
         with col_export:
-            # Génération d'un fichier TXT pour export
-            report_content = f"COMPTE RENDU RADIOLOGIQUE - ARVI-RX Pro\n"
+            report_content = f"COMPTE RENDU RADIOLOGIQUE - ARVI-RX\n"
             report_content += f"========================================\n"
             report_content += f"Médecin: Dr. Moreau\n"
             report_content += f"Patient ID: {patient_id}\n"
             report_content += f"Date: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n"
-            report_content += f"DIAGNOSTIC FINAL :\n{doctor_notes}\n\n"
-            report_content += f"--- Signature Numérique ARVI-RX ---"
+            report_content += f"RAPPORT :\n{doctor_notes}\n\n"
+            report_content += f"--- Généré par l'IA Médicale ARVI-RX ---"
             
             st.download_button(
-                label="Télécharger le PDF/TXT officiel",
+                label="TÉLÉCHARGER LE RAPPORT (TXT)",
                 data=report_content,
                 file_name=f"Rapport_{patient_id}.txt",
                 mime="text/plain",
@@ -326,7 +364,7 @@ with tab1:
             )
 
 with tab2:
-    st.markdown("### Centre Analytique des Performances")
+    st.markdown("### 📊 Data Analytics - Performances du Modèle")
     try:
         df_history = get_history()
         if df_history.empty:
@@ -345,15 +383,15 @@ with tab2:
             col_chart1, col_chart2 = st.columns(2)
             with col_chart1:
                 st.markdown("**Bilan des Diagnostics**")
-                st.bar_chart(df_history['predicted_class'].value_counts(), color="#00a8ff")
+                st.bar_chart(df_history['predicted_class'].value_counts(), color="#00ced1")
                 
             with col_chart2:
                 st.markdown("**Latence Chronologique (ms)**")
                 df_time = df_history.sort_values('created_at').set_index('created_at')
-                st.line_chart(df_time['latency_ms'], color="#00a8ff")
+                st.line_chart(df_time['latency_ms'], color="#008080")
 
             st.markdown("---")
-            st.markdown("**Traceabilité (Conformité Légale)**")
+            st.markdown("**Logs de la Base de Données (SQLite)**")
             df_display = df_history.copy()
             df_display['created_at'] = df_display['created_at'].dt.strftime('%d/%m/%Y %H:%M')
             st.dataframe(df_display, hide_index=True, use_container_width=True)
