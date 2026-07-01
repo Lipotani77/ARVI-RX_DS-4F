@@ -20,6 +20,7 @@ import base64
 
 from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails
+from src.metrics import summarize_metrics
 
 # --- Configuration SQLite ---
 DB_PATH = Path(__file__).resolve().parent.parent / "database.sqlite"
@@ -46,8 +47,27 @@ def log_run(image_name: str, model_name: str, prompt_version: str, pred: dict, d
 
 def get_history() -> pd.DataFrame:
     with sqlite3.connect(DB_PATH) as conn:
-        df = pd.read_sql_query("SELECT id, created_at, image_path, predicted_class, confidence, model_name, latency_ms FROM runs ORDER BY id DESC", conn)
+        df = pd.read_sql_query("SELECT id, created_at, image_path, predicted_class, confidence, model_name, prompt_version, latency_ms, prediction_json FROM runs ORDER BY id DESC", conn)
     return df
+
+def get_case_results(mode: str) -> pd.DataFrame:
+    """Résultats d'évaluation live pour `mode`, tels qu'insérés en base par
+    `eval/run_evaluation.py` (convention `prompt_version = f"{mode}_v1"`,
+    cf. `src/inference.py::toy_predict`)."""
+    with sqlite3.connect(DB_PATH) as conn:
+        return pd.read_sql_query(
+            "SELECT * FROM case_results WHERE prompt_version = ?",
+            conn, params=(f"{mode}_v1",),
+        )
+
+def _fmt(value, default: str = "—") -> str:
+    """Rend proprement un champ qui peut être une liste (toy backend), une chaîne
+    (MedGemma) ou None. Les listes deviennent des puces, None/vide -> défaut."""
+    if value is None or value == "" or value == []:
+        return default
+    if isinstance(value, (list, tuple)):
+        return "\n".join(f"- {item}" for item in value)
+    return str(value)
 
 init_db()
 
@@ -340,26 +360,26 @@ with tab1:
         pred = st.session_state["current_analysis"]
         tmp_path = st.session_state["current_image_path"]
         patient_id = st.session_state["patient_id"]
-        
+
         st.markdown("---")
         st.markdown("### 🎛️ Terminal de Radiologie Interactif (PACS)")
-        
-        col_img, col_tools, col_res = st.columns([1.5, 1, 1.5])
-        
+
+        col_img, col_tools = st.columns([1, 1])
+
         # Outils Interactifs d'imagerie
         with col_tools:
             st.markdown("##### Filtres Optiques")
             brightness = st.slider("Luminosité", 0.5, 2.0, 1.0, 0.1)
             contrast = st.slider("Contraste", 0.5, 2.0, 1.0, 0.1)
             show_heatmap = st.checkbox("🔮 Activer le Radar XAI (Heatmap)", value=True)
-            
+
             # Traitement de l'image
             original_img = Image.open(tmp_path).convert("RGB")
             enhancer_b = ImageEnhance.Brightness(original_img)
             img_edited = enhancer_b.enhance(brightness)
             enhancer_c = ImageEnhance.Contrast(img_edited)
             img_final = enhancer_c.enhance(contrast)
-            
+
             if show_heatmap:
                 overlay = Image.new("RGBA", img_final.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(overlay)
@@ -374,23 +394,79 @@ with tab1:
 
         with col_img:
             st.image(img_final, caption=f"Analyse Visuelle - {patient_id}", use_container_width=True)
-            
-        with col_res:
-            st.markdown("##### Bilan de l'Intelligence Artificielle")
-            p_class = pred.get("predicted_class", "uncertain")
-            if p_class == "normal":
-                st.info("✅ DIAGNOSTIC : NORMAL (Aucune opacité majeure)")
-            elif p_class == "suspected_opacity":
-                st.error("🚨 DIAGNOSTIC : SUSPECTED OPACITY (Anomalie détectée)")
-            else:
-                st.warning("❔ DIAGNOSTIC : UNCERTAIN (Examen non concluant)")
-                
-            conf = pred.get("confidence", 0.0)
-            st.metric(label="Confiance de la Prédiction", value=f"{conf*100:.1f}%")
+
+        st.markdown("---")
+        st.markdown("##### Bilan de l'Intelligence Artificielle")
+
+        p_class = pred.get("predicted_class", "uncertain")
+        if p_class == "normal":
+            st.info("✅ DIAGNOSTIC : NORMAL (Aucune opacité majeure)")
+        elif p_class == "suspected_opacity":
+            st.error("🚨 DIAGNOSTIC : SUSPECTED OPACITY (Anomalie détectée)")
+        else:
+            st.warning("❔ DIAGNOSTIC : UNCERTAIN (Examen non concluant)")
+
+        # Alertes prioritaires : toujours visibles, pas cachées dans un expander
+        g_errors = pred.get("guardrail_errors")
+        if g_errors:
+            st.warning("Anomalies de schéma détectées : " + _fmt(g_errors))
+        warning_txt = pred.get("warning")
+        if warning_txt:
+            st.caption(f"⚠️ {warning_txt}")
+
+        # Bande de métriques clés, en ligne plutôt qu'empilées
+        conf = pred.get("confidence", 0.0)
+        lat = pred.get("latency_ms")
+        iq = pred.get("image_quality")
+        mdl = pred.get("model_name")
+        pv = pred.get("prompt_version")
+
+        m_conf, m_lat, m_iq, m_model = st.columns(4)
+        with m_conf:
+            st.metric(label="Confiance", value=f"{conf*100:.1f}%")
             st.progress(float(conf))
-            
-            with st.expander("Justification Algorithmique"):
-                st.write(pred.get("justification", "Non fourni."))
+        with m_lat:
+            st.metric(label="⏱️ Temps d'inférence", value=f"{lat} ms" if lat is not None else "N/A")
+        with m_iq:
+            st.metric(label="🩻 Qualité image", value=iq or "N/A")
+        with m_model:
+            st.caption(f"🤖 Modèle : **{mdl or 'N/A'}**")
+            st.caption(f"Version prompt : **{pv or 'N/A'}**")
+
+        # Grille de cartes de détail, à la place des expanders empilés
+        row1_left, row1_right = st.columns(2)
+        with row1_left:
+            with st.container(border=True):
+                st.markdown("###### Indices visuels détectés")
+                st.write(_fmt(pred.get("visual_evidence"), "Non fourni."))
+        with row1_right:
+            with st.container(border=True):
+                st.markdown("###### Justification Algorithmique")
+                st.write(_fmt(pred.get("justification"), "Non fourni."))
+
+        row2_left, row2_right = st.columns(2)
+        with row2_left:
+            with st.container(border=True):
+                st.markdown("###### Limitations")
+                st.write(_fmt(pred.get("limitations"), "Non fourni."))
+        with row2_right:
+            with st.container(border=True):
+                st.markdown("###### 🛡️ Garde-fou (classifieur CNN)")
+                safety_class = pred.get("safety_predicted_class")
+                if safety_class is None:
+                    st.write("Aucun second avis disponible.")
+                else:
+                    accord = "✅ en accord" if safety_class == p_class else "⚠️ en désaccord"
+                    st.write(f"Diagnostic CNN : **{safety_class}** ({accord} avec le modèle principal)")
+                    safety_conf = pred.get("safety_confidence")
+                    if safety_conf is not None:
+                        st.write(f"Confiance CNN : {float(safety_conf)*100:.1f}%")
+                    probs = pred.get("safety_probabilities")
+                    if isinstance(probs, dict) and probs:
+                        st.bar_chart(pd.Series(probs), color="#008080")
+
+        with st.expander("JSON brut complet"):
+            st.json(pred)
 
         st.markdown("---")
         st.subheader("Validation Clinique et Export")
@@ -450,12 +526,126 @@ with tab2:
                 df_time = df_history.sort_values('created_at').set_index('created_at')
                 st.line_chart(df_time['latency_ms'], color="#008080")
 
+            # --- Métriques enrichies dérivées du JSON complet stocké en base ---
+            parsed_rows = []
+            for raw in df_history['prediction_json']:
+                try:
+                    parsed_rows.append(json.loads(raw) if raw else {})
+                except (json.JSONDecodeError, TypeError):
+                    parsed_rows.append({})
+            df_parsed = pd.json_normalize(parsed_rows)
+
+            st.markdown("---")
+            st.markdown("### 🔬 Métriques détaillées (données live)")
+            m1, m2 = st.columns(2)
+            # La clé de validité JSON s'appelle `_json_valid` (backend MedGemma) ou
+            # `json_valid` (pipeline d'évaluation) selon la provenance du run.
+            valid_col = next((c for c in ('_json_valid', 'json_valid') if c in df_parsed.columns), None)
+            if valid_col:
+                valid_rate = df_parsed[valid_col].fillna(False).astype(bool).mean() * 100
+                m1.metric("Taux de JSON valides", f"{valid_rate:.1f}%")
+            if 'safety_predicted_class' in df_parsed.columns:
+                paired = df_parsed['safety_predicted_class'].notna()
+                if paired.any():
+                    agree = (df_parsed.loc[paired, 'safety_predicted_class'] == df_history.loc[paired, 'predicted_class'].values).mean() * 100
+                    m2.metric("Accord garde-fou CNN", f"{agree:.1f}%")
+
+            col_q, col_c = st.columns(2)
+            with col_q:
+                if 'image_quality' in df_parsed.columns and df_parsed['image_quality'].notna().any():
+                    st.markdown("**Qualité des images**")
+                    st.bar_chart(df_parsed['image_quality'].value_counts(), color="#00ced1")
+            with col_c:
+                st.markdown("**Confiance moyenne par classe**")
+                st.bar_chart(df_history.groupby('predicted_class')['confidence'].mean(), color="#008080")
+
+            col_m, col_p = st.columns(2)
+            with col_m:
+                st.markdown("**Répartition par modèle**")
+                st.bar_chart(df_history['model_name'].value_counts(), color="#00ced1")
+            with col_p:
+                st.markdown("**Répartition par prompt**")
+                st.bar_chart(df_history['prompt_version'].value_counts(), color="#008080")
+
+            # --- Métriques d'évaluation sur jeu de test labellisé ---
+            st.markdown("---")
+            st.markdown("### 🎯 Évaluation sur jeu de test labellisé")
+            eval_mode = st.selectbox("Mode d'évaluation", ["advanced", "improved", "baseline"], index=0)
+            df_case_results = get_case_results(eval_mode)
+            ev = None
+            if not df_case_results.empty:
+                ev = summarize_metrics(df_case_results.to_dict("records"))
+                st.caption(f"📡 Données live depuis `database.sqlite` ({len(df_case_results)} cas).")
+            else:
+                eval_path = Path(__file__).resolve().parent.parent / "eval" / "outputs" / f"{eval_mode}_metrics.json"
+                if not eval_path.exists():
+                    st.info(f"Aucun rapport d'évaluation trouvé pour le mode « {eval_mode} » ({eval_path.name}).")
+                else:
+                    with open(eval_path, "r", encoding="utf-8") as f:
+                        ev = json.load(f)
+                    st.caption(f"🗂️ Rapport archivé (fichier) — aucune donnée en base pour le mode « {eval_mode} ».")
+            if ev is not None:
+                e1, e2, e3, e4 = st.columns(4)
+                e1.metric("Accuracy", f"{ev.get('accuracy', 0)*100:.1f}%")
+                e2.metric("Macro-F1", f"{ev.get('macro_f1', 0):.3f}")
+                e3.metric("Sensibilité", f"{ev.get('sensitivity', 0)*100:.1f}%")
+                e4.metric("Spécificité", f"{ev.get('specificity', 0)*100:.1f}%")
+                e5, e6, e7 = st.columns(3)
+                e5.metric("JSON valides", f"{ev.get('json_valid_rate', 0)*100:.1f}%")
+                e6.metric("Latence moyenne", f"{ev.get('avg_latency_ms', 0):.0f} ms")
+                e7.metric("Échantillon (n)", ev.get('n', 0))
+
+                cm = ev.get('confusion_matrix')
+                if cm:
+                    st.markdown("**Matrice de confusion** (lignes = vérité, colonnes = prédiction)")
+                    st.dataframe(pd.DataFrame(cm).T, use_container_width=True)
+
+                targets = ev.get('targets')
+                if targets:
+                    st.markdown("**Seuils qualité**")
+                    rows = [
+                        {
+                            "Métrique": k,
+                            "Cible": f"{v['operator']} {v['threshold']}",
+                            "Statut": "✅ Atteint" if v['pass'] else "❌ Échoué",
+                        }
+                        for k, v in targets.items()
+                    ]
+                    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+                    if ev.get('all_targets_met'):
+                        st.success("Toutes les cibles qualité sont atteintes.")
+                    else:
+                        st.warning("Certaines cibles qualité ne sont pas atteintes.")
+
             st.markdown("---")
             st.markdown("**Logs de la Base de Données (SQLite)**")
-            df_display = df_history.copy()
+            df_display = df_history.drop(columns=['prediction_json']).copy()
             df_display['created_at'] = df_display['created_at'].dt.strftime('%d/%m/%Y %H:%M')
             st.dataframe(df_display, hide_index=True, use_container_width=True)
-            
+
+            # --- Consulter le JSON complet d'un examen passé ---
+            st.markdown("---")
+            st.markdown("### 🗂️ Consulter un examen")
+            options = {
+                f"#{row.id} — {row.created_at:%d/%m/%Y %H:%M} — {row.predicted_class}": row.id
+                for row in df_history.itertuples()
+            }
+            choice = st.selectbox("Sélectionner un examen", list(options.keys()))
+            if choice:
+                run_id = options[choice]
+                raw_json = df_history.loc[df_history['id'] == run_id, 'prediction_json'].iloc[0]
+                try:
+                    parsed = json.loads(raw_json) if raw_json else {}
+                except (json.JSONDecodeError, TypeError):
+                    parsed = {}
+                st.json(parsed)
+                st.download_button(
+                    label="TÉLÉCHARGER LE JSON",
+                    data=json.dumps(parsed, ensure_ascii=False, indent=2),
+                    file_name=f"run_{run_id}.json",
+                    mime="application/json",
+                )
+
             if st.button("Rafraîchir les statistiques"):
                 st.rerun()
     except Exception as e:
