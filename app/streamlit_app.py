@@ -130,10 +130,22 @@ div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div
     transform: scale(1.02) !important;
 }
 /* Force la couleur du texte du bouton à être blanche */
-.stButton > button p, [data-testid="stFormSubmitButton"] > button p {
+.stButton > button, [data-testid="stFormSubmitButton"] > button,
+.stButton > button p, [data-testid="stFormSubmitButton"] > button p,
+.stButton > button *, [data-testid="stFormSubmitButton"] > button * {
     color: #ffffff !important;
     font-weight: 700 !important;
     letter-spacing: 1px !important;
+}
+
+/* Correction du widget de statut (Analyse en cours/terminée) */
+[data-testid="stStatusWidget"] {
+    background-color: #f8fafc !important;
+    border: 1px solid #00ced1 !important;
+    border-radius: 8px !important;
+}
+[data-testid="stStatusWidget"] * {
+    color: #001F3F !important;
 }
 
 /* Zone de dépôt (Upload) */
