@@ -11,7 +11,11 @@ REQUIRED_KEYS = {"image_quality", "predicted_class", "confidence", "visual_evide
 # ne se déclenchait jamais pour MedGemma.
 LOW_QUALITY_FLAGS = {"limited", "poor", "mauvaise"}
 WARNING_TEXT = "Prototype pédagogique. Non destiné au diagnostic. Validation par un professionnel qualifié requise."
+
+# Seuil du garde-fou (CNN)
 SAFETY_CONFIDENCE_FLOOR = 0.55
+
+# Seuil de confiance de MedGemma
 MAIN_CONFIDENCE_FLOOR = 0.6
 
 
