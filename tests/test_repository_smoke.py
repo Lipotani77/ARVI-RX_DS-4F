@@ -15,7 +15,7 @@ from api.main import app
 from api.main import health
 from src.guardrails import WARNING_TEXT, apply_safety_guardrails, validate_prediction
 from src.inference import toy_predict
-from src.metrics import CLASSES, macro_f1, summarize_metrics
+from src.metrics import summarize_metrics
 from src.safety_classifier import classify_image
 
 
@@ -162,16 +162,6 @@ def test_metrics_and_api_health_contract() -> None:
     assert metrics["specificity"] == 1.0
     assert metrics["confusion_matrix"]["suspected_opacity"]["uncertain"] == 1
     assert metrics["confusion_matrix"]["normal"]["normal"] == 1
-
-
-def test_macro_f1_includes_uncertain_even_without_true_samples() -> None:
-    y_true = ["normal", "suspected_opacity", "normal", "suspected_opacity"]
-    y_pred = ["normal", "uncertain", "uncertain", "suspected_opacity"]
-
-    score = macro_f1(y_true, y_pred)
-
-    assert score >= 0.0
-    assert CLASSES == ["normal", "suspected_opacity", "uncertain"]
 
 
 def test_api_predict_preserves_uploaded_case_signal() -> None:

@@ -21,12 +21,9 @@ from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails, validate_prediction
 from src.metrics import summarize_metrics, CLASSES
 from src.database import insert_case_result, insert_run, init_db
-from src.safety_classifier import classify_image
 
 
 JSON_VALID_RATE_THRESHOLD = 0.95
-RSNA_UNCERTAIN_CONFIDENCE_FLOOR = 0.45
-RSNA_NORMAL_CONFIDENCE_FLOOR = 0.65
 
 
 def read_cases(path: Path) -> list[dict]:
@@ -40,9 +37,6 @@ def build_rsna_cases(limit: int = 20) -> list[dict]:
     Aucun CSV de labels n'accompagne RSNA_Pneumonia : on dérive la vérité-terrain
     du masque de segmentation apparié (même nom de fichier). Masque tout-noir →
     `normal`, masque avec au moins un pixel non nul → `suspected_opacity`.
-    Si le masque est vide, on garde `normal` seulement quand le classifieur de
-    sécurité est confiant sur `normal`; sinon on produit `uncertain` pour disposer
-    d'un vrai troisième groupe de référence côté évaluation.
     Même format de dict que `read_cases` (clés `case_id`, `image_path`, `label`).
     """
     img_dir = ROOT / 'data' / 'RSNA_Pneumonia' / 'Images'
@@ -50,14 +44,7 @@ def build_rsna_cases(limit: int = 20) -> list[dict]:
     cases = []
     for img in sorted(img_dir.glob('*.png'))[:limit]:
         mask = np.array(Image.open(mask_dir / img.name).convert('L'))
-        if mask.any():
-            label = 'suspected_opacity'
-        else:
-            safety_pred = classify_image(img)
-            if safety_pred.get('predicted_class') == 'normal' and float(safety_pred.get('confidence', 0.0)) >= RSNA_NORMAL_CONFIDENCE_FLOOR:
-                label = 'normal'
-            else:
-                label = 'uncertain'
+        label = 'suspected_opacity' if mask.any() else 'normal'
         cases.append({
             'case_id': img.stem,
             'image_path': str(img.relative_to(ROOT)).replace('\\', '/'),

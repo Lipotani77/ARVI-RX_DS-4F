@@ -32,7 +32,7 @@ def macro_f1(y_true: Iterable[str], y_pred: Iterable[str], classes: list[str] = 
         recall = tp / (tp + fn) if tp + fn else 0
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0
         scores.append(f1)
-    return sum(scores) / len(scores) if scores else 0.0
+    return sum(scores) / len(scores)
 
 
 def confusion_counts(y_true: Iterable[str], y_pred: Iterable[str]) -> dict[str, int]:
