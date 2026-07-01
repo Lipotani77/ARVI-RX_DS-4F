@@ -262,7 +262,7 @@ with st.sidebar:
         st.rerun()
 
 # Onglets
-tab1, tab2, tab3 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation Technique"])
+tab1, tab2, tab3, tab4 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation", "💬 Assistant Support"])
 
 with tab1:
     col_upload, col_context = st.columns([2, 1])
@@ -443,3 +443,35 @@ with tab3:
             st.markdown(f.read())
     else:
         st.warning("Document introuvable.")
+
+with tab4:
+    st.markdown("### 🤖 ARVI-Bot (Support Technique)")
+    st.info("Posez vos questions sur le fonctionnement du logiciel, les erreurs ou l'analyse des radiographies.")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Bonjour Dr. Moreau. Comment puis-je vous aider aujourd'hui avec le terminal ARVI-RX ?"}]
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Posez votre question à ARVI-Bot..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        p_lower = prompt.lower()
+        if "analyse" in p_lower or "comment" in p_lower:
+            response = "Pour analyser un patient, rendez-vous dans l'onglet **Scanner un patient**. Importez une image dans la zone de dépôt et cliquez sur **LANCER LE DIAGNOSTIC IA**."
+        elif "erreur" in p_lower or "bug" in p_lower or "marche pas" in p_lower or "uncertain" in p_lower:
+            response = "Si vous rencontrez une erreur (par exemple UNCERTAIN), nos algorithmes (Guardrails) ont probablement détecté une image de mauvaise qualité ou non-frontale. Essayez avec un cliché plus net."
+        elif "qui" in p_lower or "equipe" in p_lower or "créateur" in p_lower:
+            response = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists (dont Lazzem et William) afin de révolutionner l'imagerie médicale !"
+        elif "merci" in p_lower:
+            response = "Je vous en prie ! N'hésitez pas si vous avez d'autres questions."
+        else:
+            response = "Je suis l'assistant de premier niveau ARVI-Bot. Pour des problèmes plus complexes concernant l'API MedGemma, veuillez vous référer à la section **Documentation**."
+
+        with st.chat_message("assistant"):
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
