@@ -57,7 +57,7 @@ def _warmup_medgemma():
     from src.inference_medgemma import _get_pipe
     return _get_pipe()
 
-# --- Config & Style (ULTRA-PREMIUM, LOGO COLORS) ---
+# --- Config & Style (ULTRA-PREMIUM, FIXES) ---
 st.set_page_config(page_title="ARVI-RX Intelligence", layout="wide")
 
 def get_base64_image(image_path):
@@ -80,7 +80,7 @@ st.markdown("""
     100% { box-shadow: 0 0 0 0 rgba(0, 206, 209, 0); }
 }
 
-/* Arrière-plan Animé "Mesh Gradient" (Blanc / Teal / Cyan très doux) */
+/* Arrière-plan Animé "Mesh Gradient" */
 .stApp {
     background: linear-gradient(-45deg, #ffffff, #f0fdfa, #e0f2fe, #ffffff);
     background-size: 400% 400%;
@@ -89,52 +89,66 @@ st.markdown("""
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
-/* Cartes (Glassmorphism ultra-poussé avec les couleurs du logo) */
+/* Cartes Principales */
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
-    background: rgba(255, 255, 255, 0.85) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px) !important;
-    border-left: 4px solid #00ced1 !important; /* Couleur Teal du logo */
+    border-left: 4px solid #00ced1 !important;
     border-top: 1px solid rgba(255,255,255,0.8) !important;
     border-radius: 12px !important;
-    box-shadow: 0 15px 35px rgba(0, 31, 63, 0.05), 0 5px 15px rgba(0, 206, 209, 0.08) !important;
+    box-shadow: 0 10px 25px rgba(0, 31, 63, 0.05) !important;
     padding: 30px !important;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"]:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 25px 45px rgba(0, 31, 63, 0.08), 0 10px 20px rgba(0, 206, 209, 0.15) !important;
 }
 
-/* Sidebar élégante bleu marine profond (du logo) */
+/* Sidebar élégante */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #001F3F 0%, #0f172a 100%) !important;
 }
-[data-testid="stSidebar"] * {
+/* Ciblage spécifique du texte dans la sidebar pour éviter le bug des dropdowns blancs sur fond blanc */
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label {
     color: #f8fafc !important;
 }
-[data-testid="stSidebar"] .stRadio label, [data-testid="stSidebar"] .stSelectbox label {
-    color: #00ced1 !important; /* Accents Cyan */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+    color: #94a3b8 !important;
+}
+[data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stRadio label {
+    color: #00ced1 !important; 
 }
 
-/* Boutons d'Action (Originaux et vibrants) */
-.stButton > button {
+/* Boutons d'Action (Correction du texte invisible) */
+.stButton > button, [data-testid="stFormSubmitButton"] > button {
     background: linear-gradient(135deg, #001F3F 0%, #008080 50%, #00ced1 100%) !important;
     background-size: 200% auto !important;
-    color: #ffffff !important;
     border: none !important;
     border-radius: 30px !important;
-    font-weight: 700 !important;
-    letter-spacing: 1px;
     box-shadow: 0 8px 20px rgba(0, 128, 128, 0.3) !important;
     transition: 0.5s !important;
 }
-.stButton > button:hover {
+.stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
     background-position: right center !important;
     box-shadow: 0 12px 25px rgba(0, 206, 209, 0.5) !important;
-    transform: scale(1.05) !important;
+    transform: scale(1.02) !important;
+}
+/* Force la couleur du texte du bouton à être blanche */
+.stButton > button, [data-testid="stFormSubmitButton"] > button,
+.stButton > button p, [data-testid="stFormSubmitButton"] > button p,
+.stButton > button *, [data-testid="stFormSubmitButton"] > button * {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px !important;
 }
 
-/* Bouton principal clignotant (Upload) */
+/* Correction du widget de statut (Analyse en cours/terminée) */
+[data-testid="stStatusWidget"] {
+    background-color: #f8fafc !important;
+    border: 1px solid #00ced1 !important;
+    border-radius: 8px !important;
+}
+[data-testid="stStatusWidget"] * {
+    color: #001F3F !important;
+}
+
+/* Zone de dépôt (Upload) */
 [data-testid="stFileUploader"] section {
     border: 2px dashed #00ced1 !important;
     border-radius: 16px !important;
@@ -142,12 +156,31 @@ div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div
     animation: pulse-border 3s infinite;
 }
 
-/* Onglets en style 'Pillules' (Très original) */
+/* Correction des Titres d'Expanders (Parties de résultats) */
+[data-testid="stExpander"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+}
+[data-testid="stExpander"] summary p {
+    color: #001F3F !important;
+    font-weight: 800 !important;
+}
+
+/* Text Area */
+textarea {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+}
+
+/* Onglets en style 'Pillules' */
 [data-testid="stTabs"] button {
-    background-color: rgba(255,255,255,0.5) !important;
+    background-color: transparent !important;
     border-radius: 20px !important;
     margin-right: 10px !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
     color: #001F3F !important;
 }
 [data-testid="stTabs"] button[aria-selected="true"] {
@@ -155,12 +188,39 @@ div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div
     color: white !important;
     border: 1px solid #001F3F !important;
 }
+[data-testid="stTabs"] button[aria-selected="true"] p {
+    color: white !important;
+}
 
-/* Titres avec la couleur Navy du logo */
+/* Titres Globaux */
 h1, h2, h3 { color: #001F3F !important; font-weight: 800 !important; letter-spacing: -0.5px; }
-/* KPIs & Métriques */
 [data-testid="stMetricValue"] { color: #008080 !important; font-size: 2.5rem !important; font-weight: 900 !important;}
 
+/* Floating Chat Widget (Hacking CSS) */
+div[data-testid="stExpander"]:last-of-type {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 350px !important;
+    z-index: 999999 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 2px solid #00ced1 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 40px rgba(0,31,63,0.3) !important;
+}
+div[data-testid="stExpander"]:last-of-type summary {
+    background: linear-gradient(90deg, #001F3F 0%, #008080 100%) !important;
+    border-radius: 8px !important;
+    padding: 10px 15px !important;
+}
+div[data-testid="stExpander"]:last-of-type summary p {
+    color: white !important;
+    font-weight: bold !important;
+}
+div[data-testid="stExpander"]:last-of-type .stMarkdown p {
+    color: #001F3F !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -218,7 +278,7 @@ with st.sidebar:
             st.error("Serveur MedGemma injoignable. Passage en simulation.")
             use_medgemma = False
     
-    mode = st.selectbox("Injection de Prompt", ["advanced", "improved", "baseline"], index=0)
+    mode = st.radio("Injection de Prompt", ["advanced", "improved", "baseline"], index=0)
     
     st.markdown("---")
     if st.button("DÉCONNEXION SÉCURISÉE"):
@@ -305,7 +365,7 @@ with tab1:
                 draw = ImageDraw.Draw(overlay)
                 w, h = img_final.size
                 if pred.get("predicted_class") == "suspected_opacity":
-                    # Gradient cyan/teal très stylisé pour coller aux couleurs du logo
+                    # Gradient cyan/teal très stylisé
                     draw.ellipse((w//3, h//3, 2*w//3, 2*h//3), fill=(0, 206, 209, 110))
                     overlay = overlay.filter(ImageFilter.GaussianBlur(35))
                 else:
@@ -408,3 +468,43 @@ with tab3:
             st.markdown(f.read())
     else:
         st.warning("Document introuvable.")
+
+# --- FLOATING CHATBOT WIDGET ---
+with st.expander("💬 ARVI-Bot (Support Utilisateur)", expanded=False):
+    st.markdown("<small style='color: #008080;'>Posez vos questions sur l'analyse, les fonctionnalités ou la technique.</small>", unsafe_allow_html=True)
+    
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [{"role": "🤖 ARVI-Bot", "content": "Bonjour Dr. Moreau ! Comment puis-je vous aider aujourd'hui avec le terminal ARVI-RX ?"}]
+        
+    for msg in st.session_state.chat_history:
+        color = "#001F3F" if "ARVI-Bot" in msg['role'] else "#00ced1"
+        st.markdown(f"<strong style='color:{color}'>{msg['role']}</strong>: {msg['content']}", unsafe_allow_html=True)
+        
+    with st.form("chat_form", clear_on_submit=True):
+        cols = st.columns([4, 1.5])
+        with cols[0]:
+            user_input = st.text_input("Message...", label_visibility="collapsed", placeholder="Ex: Comment analyser une radio ?")
+        with cols[1]:
+            submitted = st.form_submit_button("Envoyer", use_container_width=True)
+            
+        if submitted and user_input:
+            st.session_state.chat_history.append({"role": "👤 Vous", "content": user_input})
+            
+            p_lower = user_input.lower()
+            if any(k in p_lower for k in ["analyse", "comment", "scanner", "radio"]):
+                rep = "Pour analyser un patient, rendez-vous dans l'onglet **Scanner un patient**. Importez une image dans la zone de dépôt (format DICOM, PNG, JPG) et cliquez sur **LANCER LE DIAGNOSTIC IA**."
+            elif any(k in p_lower for k in ["erreur", "bug", "marche pas", "uncertain", "problème"]):
+                rep = "Si vous rencontrez une erreur (par exemple UNCERTAIN), nos algorithmes (Guardrails) ont probablement détecté une image de mauvaise qualité ou non-frontale. Veuillez réessayer avec un cliché plus net."
+            elif any(k in p_lower for k in ["pacs", "luminosité", "contraste", "filtre", "xai"]):
+                rep = "Notre Viewer PACS interactif vous permet d'ajuster la luminosité et le contraste de l'image. La coche 'Radar XAI' met en évidence la zone d'attention du modèle."
+            elif any(k in p_lower for k in ["technique", "modèle", "vlm", "medgemma"]):
+                rep = "ARVI-RX utilise un modèle VLM (Vision-Language Model) MedGemma 4B affiné pour la radiologie thoracique, capable de détecter des opacités avec une précision élevée."
+            elif any(k in p_lower for k in ["export", "rapport", "sauvegarder"]):
+                rep = "Une fois le diagnostic généré, vous pouvez modifier le compte-rendu puis le valider pour l'enregistrer dans la base sécurisée, ou l'exporter au format TXT."
+            elif any(k in p_lower for k in ["équipe", "qui", "créateur"]):
+                rep = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs : Leila, William, Killian, Thomas, Iza et Victor."
+            else:
+                rep = "Je suis l'assistant de premier niveau. Je peux vous renseigner sur l'analyse d'image, le fonctionnement des filtres PACS ou les erreurs techniques !"
+                
+            st.session_state.chat_history.append({"role": "🤖 ARVI-Bot", "content": rep})
+            st.rerun()
