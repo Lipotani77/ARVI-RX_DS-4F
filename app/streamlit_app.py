@@ -466,7 +466,7 @@ with tab4:
         elif "erreur" in p_lower or "bug" in p_lower or "marche pas" in p_lower or "uncertain" in p_lower:
             response = "Si vous rencontrez une erreur (par exemple UNCERTAIN), nos algorithmes (Guardrails) ont probablement détecté une image de mauvaise qualité ou non-frontale. Essayez avec un cliché plus net."
         elif "qui" in p_lower or "equipe" in p_lower or "créateur" in p_lower:
-            response = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists (dont Lazzem et William) afin de révolutionner l'imagerie médicale !"
+            response = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists (Leila, William, Killian, Thomas, Iza et Victor) afin de révolutionner l'imagerie médicale !"
         elif "merci" in p_lower:
             response = "Je vous en prie ! N'hésitez pas si vous avez d'autres questions."
         else:
