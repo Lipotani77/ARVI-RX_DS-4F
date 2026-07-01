@@ -57,7 +57,7 @@ def _warmup_medgemma():
     from src.inference_medgemma import _get_pipe
     return _get_pipe()
 
-# --- Config & Style (ULTRA-PREMIUM, LOGO COLORS) ---
+# --- Config & Style (ULTRA-PREMIUM, FIXES) ---
 st.set_page_config(page_title="ARVI-RX Intelligence", layout="wide")
 
 def get_base64_image(image_path):
@@ -80,7 +80,7 @@ st.markdown("""
     100% { box-shadow: 0 0 0 0 rgba(0, 206, 209, 0); }
 }
 
-/* Arrière-plan Animé "Mesh Gradient" (Blanc / Teal / Cyan très doux) */
+/* Arrière-plan Animé "Mesh Gradient" */
 .stApp {
     background: linear-gradient(-45deg, #ffffff, #f0fdfa, #e0f2fe, #ffffff);
     background-size: 400% 400%;
@@ -89,52 +89,54 @@ st.markdown("""
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
-/* Cartes (Glassmorphism ultra-poussé avec les couleurs du logo) */
+/* Cartes Principales */
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
-    background: rgba(255, 255, 255, 0.85) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px) !important;
-    border-left: 4px solid #00ced1 !important; /* Couleur Teal du logo */
+    border-left: 4px solid #00ced1 !important;
     border-top: 1px solid rgba(255,255,255,0.8) !important;
     border-radius: 12px !important;
-    box-shadow: 0 15px 35px rgba(0, 31, 63, 0.05), 0 5px 15px rgba(0, 206, 209, 0.08) !important;
+    box-shadow: 0 10px 25px rgba(0, 31, 63, 0.05) !important;
     padding: 30px !important;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"]:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 25px 45px rgba(0, 31, 63, 0.08), 0 10px 20px rgba(0, 206, 209, 0.15) !important;
 }
 
-/* Sidebar élégante bleu marine profond (du logo) */
+/* Sidebar élégante */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #001F3F 0%, #0f172a 100%) !important;
 }
-[data-testid="stSidebar"] * {
+/* Ciblage spécifique du texte dans la sidebar pour éviter le bug des dropdowns blancs sur fond blanc */
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label {
     color: #f8fafc !important;
 }
-[data-testid="stSidebar"] .stRadio label, [data-testid="stSidebar"] .stSelectbox label {
-    color: #00ced1 !important; /* Accents Cyan */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+    color: #94a3b8 !important;
+}
+[data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stRadio label {
+    color: #00ced1 !important; 
 }
 
-/* Boutons d'Action (Originaux et vibrants) */
-.stButton > button {
+/* Boutons d'Action (Correction du texte invisible) */
+.stButton > button, [data-testid="stFormSubmitButton"] > button {
     background: linear-gradient(135deg, #001F3F 0%, #008080 50%, #00ced1 100%) !important;
     background-size: 200% auto !important;
-    color: #ffffff !important;
     border: none !important;
     border-radius: 30px !important;
-    font-weight: 700 !important;
-    letter-spacing: 1px;
     box-shadow: 0 8px 20px rgba(0, 128, 128, 0.3) !important;
     transition: 0.5s !important;
 }
-.stButton > button:hover {
+.stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {
     background-position: right center !important;
     box-shadow: 0 12px 25px rgba(0, 206, 209, 0.5) !important;
-    transform: scale(1.05) !important;
+    transform: scale(1.02) !important;
+}
+/* Force la couleur du texte du bouton à être blanche */
+.stButton > button p, [data-testid="stFormSubmitButton"] > button p {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px !important;
 }
 
-/* Bouton principal clignotant (Upload) */
+/* Zone de dépôt (Upload) */
 [data-testid="stFileUploader"] section {
     border: 2px dashed #00ced1 !important;
     border-radius: 16px !important;
@@ -142,12 +144,31 @@ div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div
     animation: pulse-border 3s infinite;
 }
 
-/* Onglets en style 'Pillules' (Très original) */
+/* Correction des Titres d'Expanders (Parties de résultats) */
+[data-testid="stExpander"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+}
+[data-testid="stExpander"] summary p {
+    color: #001F3F !important;
+    font-weight: 800 !important;
+}
+
+/* Text Area */
+textarea {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+}
+
+/* Onglets en style 'Pillules' */
 [data-testid="stTabs"] button {
-    background-color: rgba(255,255,255,0.5) !important;
+    background-color: transparent !important;
     border-radius: 20px !important;
     margin-right: 10px !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
     color: #001F3F !important;
 }
 [data-testid="stTabs"] button[aria-selected="true"] {
@@ -155,10 +176,12 @@ div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div
     color: white !important;
     border: 1px solid #001F3F !important;
 }
+[data-testid="stTabs"] button[aria-selected="true"] p {
+    color: white !important;
+}
 
-/* Titres avec la couleur Navy du logo */
+/* Titres Globaux */
 h1, h2, h3 { color: #001F3F !important; font-weight: 800 !important; letter-spacing: -0.5px; }
-/* KPIs & Métriques */
 [data-testid="stMetricValue"] { color: #008080 !important; font-size: 2.5rem !important; font-weight: 900 !important;}
 
 </style>
@@ -305,7 +328,7 @@ with tab1:
                 draw = ImageDraw.Draw(overlay)
                 w, h = img_final.size
                 if pred.get("predicted_class") == "suspected_opacity":
-                    # Gradient cyan/teal très stylisé pour coller aux couleurs du logo
+                    # Gradient cyan/teal très stylisé
                     draw.ellipse((w//3, h//3, 2*w//3, 2*h//3), fill=(0, 206, 209, 110))
                     overlay = overlay.filter(ImageFilter.GaussianBlur(35))
                 else:
