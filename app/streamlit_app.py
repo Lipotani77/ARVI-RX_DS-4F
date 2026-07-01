@@ -253,7 +253,7 @@ with st.sidebar:
             st.error("Serveur MedGemma injoignable. Passage en simulation.")
             use_medgemma = False
     
-    mode = st.selectbox("Injection de Prompt", ["advanced", "improved", "baseline"], index=0)
+    mode = st.radio("Injection de Prompt", ["advanced", "improved", "baseline"], index=0)
     
     st.markdown("---")
     if st.button("DÉCONNEXION SÉCURISÉE"):
