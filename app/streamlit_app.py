@@ -469,20 +469,12 @@ with tab3:
     else:
         st.warning("Document introuvable.")
 
-with tab3:
-    guide_path = Path(__file__).resolve().parent.parent / "docs" / "guide_utilisateur.md"
-    if guide_path.exists():
-        with open(guide_path, "r", encoding="utf-8") as f:
-            st.markdown(f.read())
-    else:
-        st.warning("Document introuvable.")
-
 # --- FLOATING CHATBOT WIDGET ---
-with st.expander("💬 ARVI-Bot (Cliquez pour ouvrir)", expanded=False):
-    st.markdown("<small style='color: #008080;'>Posez vos questions sur le projet, l'IA ou l'application.</small>", unsafe_allow_html=True)
+with st.expander("💬 ARVI-Bot (Support Utilisateur)", expanded=False):
+    st.markdown("<small style='color: #008080;'>Posez vos questions sur l'analyse, les fonctionnalités ou la technique.</small>", unsafe_allow_html=True)
     
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = [{"role": "🤖 ARVI-Bot", "content": "Bonjour ! Je suis programmé pour répondre aux questions du jury."}]
+        st.session_state.chat_history = [{"role": "🤖 ARVI-Bot", "content": "Bonjour Dr. Moreau ! Comment puis-je vous aider aujourd'hui avec le terminal ARVI-RX ?"}]
         
     for msg in st.session_state.chat_history:
         color = "#001F3F" if "ARVI-Bot" in msg['role'] else "#00ced1"
@@ -491,7 +483,7 @@ with st.expander("💬 ARVI-Bot (Cliquez pour ouvrir)", expanded=False):
     with st.form("chat_form", clear_on_submit=True):
         cols = st.columns([4, 1.5])
         with cols[0]:
-            user_input = st.text_input("Message...", label_visibility="collapsed", placeholder="Posez une question...")
+            user_input = st.text_input("Message...", label_visibility="collapsed", placeholder="Ex: Comment analyser une radio ?")
         with cols[1]:
             submitted = st.form_submit_button("Envoyer", use_container_width=True)
             
@@ -499,18 +491,20 @@ with st.expander("💬 ARVI-Bot (Cliquez pour ouvrir)", expanded=False):
             st.session_state.chat_history.append({"role": "👤 Vous", "content": user_input})
             
             p_lower = user_input.lower()
-            if any(k in p_lower for k in ["python", "streamlit", "sqlite", "stack", "techno", "architecture"]):
-                rep = "Notre architecture repose sur Python avec Streamlit pour une interface web réactive et performante, ainsi qu'une base de données SQLite locale assurant la traçabilité HDS."
-            elif any(k in p_lower for k in ["modèle", "ia", "vlm", "medgemma"]):
-                rep = "Nous utilisons un modèle VLM (Vision-Language Model), capable d'interpréter simultanément du texte et de l'image, affiné pour la radiologie thoracique frontale."
-            elif any(k in p_lower for k in ["budget", "marché", "cible", "vendre", "argent"]):
-                rep = "Notre cible : les services d'urgence et les cabinets de radiologie. L'objectif est de réduire le temps de diagnostic, désengorger les urgences et rentabiliser l'investissement logiciel par l'optimisation du temps médical."
-            elif any(k in p_lower for k in ["medecin", "remplacer", "éthique", "limite"]):
-                rep = "Éthique : ARVI-RX est un outil d'aide à la décision (Copilote). La validation finale (Human-in-the-loop) incombe toujours au praticien. L'IA ne remplace pas le médecin."
+            if any(k in p_lower for k in ["analyse", "comment", "scanner", "radio"]):
+                rep = "Pour analyser un patient, rendez-vous dans l'onglet **Scanner un patient**. Importez une image dans la zone de dépôt (format DICOM, PNG, JPG) et cliquez sur **LANCER LE DIAGNOSTIC IA**."
+            elif any(k in p_lower for k in ["erreur", "bug", "marche pas", "uncertain", "problème"]):
+                rep = "Si vous rencontrez une erreur (par exemple UNCERTAIN), nos algorithmes (Guardrails) ont probablement détecté une image de mauvaise qualité ou non-frontale. Veuillez réessayer avec un cliché plus net."
+            elif any(k in p_lower for k in ["pacs", "luminosité", "contraste", "filtre", "xai"]):
+                rep = "Notre Viewer PACS interactif vous permet d'ajuster la luminosité et le contraste de l'image. La coche 'Radar XAI' met en évidence la zone d'attention du modèle."
+            elif any(k in p_lower for k in ["technique", "modèle", "vlm", "medgemma"]):
+                rep = "ARVI-RX utilise un modèle VLM (Vision-Language Model) MedGemma 4B affiné pour la radiologie thoracique, capable de détecter des opacités avec une précision élevée."
+            elif any(k in p_lower for k in ["export", "rapport", "sauvegarder"]):
+                rep = "Une fois le diagnostic généré, vous pouvez modifier le compte-rendu puis le valider pour l'enregistrer dans la base sécurisée, ou l'exporter au format TXT."
             elif any(k in p_lower for k in ["équipe", "qui", "créateur"]):
-                rep = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists : Leila, William, Killian, Thomas, Iza et Victor !"
+                rep = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs : Leila, William, Killian, Thomas, Iza et Victor."
             else:
-                rep = "Je suis l'assistant virtuel. Je peux vous renseigner sur la technique, le modèle IA, le budget ou l'équipe !"
+                rep = "Je suis l'assistant de premier niveau. Je peux vous renseigner sur l'analyse d'image, le fonctionnement des filtres PACS ou les erreurs techniques !"
                 
             st.session_state.chat_history.append({"role": "🤖 ARVI-Bot", "content": rep})
             st.rerun()
