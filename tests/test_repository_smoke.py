@@ -16,6 +16,7 @@ from api.main import health
 from src.guardrails import WARNING_TEXT, apply_safety_guardrails, validate_prediction
 from src.inference import toy_predict
 from src.metrics import summarize_metrics
+from src.safety_classifier import classify_image
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,13 +76,26 @@ def test_synthetic_dataset_contract_is_valid() -> None:
 
 def test_prediction_schema_warning_and_guardrails() -> None:
     image_path = ROOT / "data" / "sample_images" / "CXR_SYN_002_suspected_opacity.png"
-    pred = apply_safety_guardrails(toy_predict(image_path, mode="improved"))
+    pred = apply_safety_guardrails(toy_predict(image_path, mode="improved"), image_path=image_path)
     valid, errors = validate_prediction(pred)
 
     assert valid, errors
     assert pred["predicted_class"] in {"normal", "suspected_opacity", "uncertain"}
     assert pred["warning"] == WARNING_TEXT
     assert "not a validated medical model" in pred["limitations"]
+
+
+def test_lightweight_guardrail_classifier_is_image_based() -> None:
+    opacity = ROOT / "data" / "sample_images" / "CXR_SYN_002_suspected_opacity.png"
+    uncertain = ROOT / "data" / "sample_images" / "CXR_SYN_003_uncertain.png"
+
+    opacity_pred = classify_image(opacity)
+    uncertain_pred = classify_image(uncertain)
+
+    assert opacity_pred["predicted_class"] == "suspected_opacity"
+    assert opacity_pred["confidence"] >= 0.5
+    assert uncertain_pred["predicted_class"] == "uncertain"
+    assert uncertain_pred["confidence"] >= 0.5
 
 
 def test_python_source_tree_compiles() -> None:
@@ -198,3 +212,40 @@ def test_evaluation_command_runs_and_preserves_warning_contract(tmp_path: Path) 
     assert all(row["warning_rate"] == 1.0 for row in summary)
     assert (out_dir / "before_after_summary.csv").exists()
     assert db_path.exists()
+
+
+def test_sqlite_stores_case_results_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "medical_ai_evidence.sqlite"
+    out_dir = tmp_path / "outputs"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "eval/run_evaluation.py",
+            "--mode",
+            "toy",
+            "--out-dir",
+            str(out_dir),
+            "--db-path",
+            str(db_path),
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM case_results").fetchone()[0]
+    finally:
+        conn.close()
+
+    assert count >= 20

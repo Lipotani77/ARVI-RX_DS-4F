@@ -39,3 +39,35 @@ def insert_run(db_path: str | Path, case_id: str, image_path: str, prediction: d
         ),
     )
     conn.commit(); conn.close()
+
+
+def insert_case_result(db_path: str | Path, row: dict, prediction: dict) -> None:
+    init_db(db_path)
+    conn = connect(db_path)
+    conn.execute(
+        """
+        INSERT INTO case_results(
+            case_id, image_path, label, predicted_class, confidence,
+            safety_predicted_class, safety_confidence, json_valid, warning,
+            latency_ms, guardrail_errors, model_name, prompt_version, prediction_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            row.get("case_id"),
+            row.get("image_path", ""),
+            row.get("label"),
+            row.get("predicted_class"),
+            float(row.get("confidence", 0.0)),
+            row.get("safety_predicted_class", ""),
+            float(row.get("safety_confidence", 0.0) or 0.0),
+            int(bool(row.get("json_valid", False))),
+            row.get("warning", ""),
+            int(row.get("latency_ms", 0)),
+            row.get("guardrail_errors", ""),
+            prediction.get("model_name"),
+            prediction.get("prompt_version"),
+            json.dumps(prediction, ensure_ascii=False),
+        ),
+    )
+    conn.commit(); conn.close()

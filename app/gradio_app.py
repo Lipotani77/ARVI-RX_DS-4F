@@ -14,7 +14,7 @@ from src.guardrails import apply_safety_guardrails
 def analyze(image_path, mode):
     if image_path is None:
         return {"error": "no image"}
-    return apply_safety_guardrails(toy_predict(image_path, mode=mode))
+    return apply_safety_guardrails(toy_predict(image_path, mode=mode), image_path=image_path)
 
 
 demo = gr.Interface(

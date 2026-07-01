@@ -55,7 +55,7 @@ def test_medgemma_evaluation_command_runs_and_preserves_warning_contract(
 ) -> None:
     summary = medgemma_smoke_result["summary"]
     assert {row["mode"] for row in summary} == {"baseline"}
-    assert all(row["json_valid_rate"] >= 0.9 for row in summary)
+    assert all(row["json_valid_rate"] >= 0.95 for row in summary)
     assert all(row["warning_rate"] == 1.0 for row in summary)
     assert (Path(medgemma_smoke_result["out_dir"]) / "before_after_summary.csv").exists()
     assert Path(medgemma_smoke_result["db_path"]).exists()

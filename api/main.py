@@ -28,4 +28,4 @@ async def predict(file: UploadFile = File(...)) -> dict:
     with target.open("wb") as f:
         shutil.copyfileobj(file.file, f)
     pred = toy_predict(target, mode="improved")
-    return apply_safety_guardrails(pred)
+    return apply_safety_guardrails(pred, image_path=target)

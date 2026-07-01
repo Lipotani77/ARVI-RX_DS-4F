@@ -28,6 +28,25 @@ CREATE TABLE IF NOT EXISTS runs (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS case_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT,
+    image_path TEXT,
+    label TEXT,
+    predicted_class TEXT,
+    confidence REAL,
+    safety_predicted_class TEXT,
+    safety_confidence REAL,
+    json_valid INTEGER,
+    warning TEXT,
+    latency_ms INTEGER,
+    guardrail_errors TEXT,
+    model_name TEXT,
+    prompt_version TEXT,
+    prediction_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS evaluations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id INTEGER,

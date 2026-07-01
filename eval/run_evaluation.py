@@ -20,7 +20,10 @@ sys.path.append(str(ROOT))
 from src.inference import toy_predict
 from src.guardrails import apply_safety_guardrails, validate_prediction
 from src.metrics import summarize_metrics, CLASSES
-from src.database import insert_run, init_db
+from src.database import insert_case_result, insert_run, init_db
+
+
+JSON_VALID_RATE_THRESHOLD = 0.95
 
 
 def read_cases(path: Path) -> list[dict]:
@@ -80,7 +83,7 @@ def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
         predict = lambda p: toy_predict(p, mode=mode)
     for case in cases:
         image_path = ROOT / case['image_path']
-        pred = apply_safety_guardrails(predict(image_path))
+        pred = apply_safety_guardrails(predict(image_path), image_path=image_path)
         valid, errors = validate_prediction(pred)
         # json_valid = schéma conforme ET JSON réellement parsable. Le parser MedGemma
         # expose `json_valid` (False sur sortie tronquée même si la classe a été récupérée) :
@@ -89,9 +92,12 @@ def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
         json_valid = valid and pred.get('json_valid', True)
         row = {
             'case_id': case['case_id'],
+            'image_path': str(image_path),
             'label': case['label'],
             'predicted_class': pred['predicted_class'],
             'confidence': pred['confidence'],
+            'safety_predicted_class': pred.get('safety_predicted_class', ''),
+            'safety_confidence': pred.get('safety_confidence', ''),
             'json_valid': json_valid,
             'warning': pred.get('warning', ''),
             'latency_ms': pred.get('latency_ms', 0),
@@ -99,7 +105,14 @@ def run(mode: str, db_path: Path, cases: list[dict], backend: str = 'toy',
         }
         rows.append(row)
         insert_run(db_path, case['case_id'], str(image_path), pred)
+        insert_case_result(db_path, row, pred)
     metrics = summarize_metrics(rows)
+
+    if backend == 'medgemma' and metrics.get('json_valid_rate', 0.0) < JSON_VALID_RATE_THRESHOLD:
+        raise RuntimeError(
+            f"json_valid_rate {metrics.get('json_valid_rate', 0.0):.4f} below threshold {JSON_VALID_RATE_THRESHOLD:.2f}"
+        )
+    
     return rows, metrics
 
 

@@ -185,6 +185,18 @@ PROMPTS = {mode: _load_prompt(fname) for mode, fname in _PROMPT_FILES.items()}
 # prompt). latence ≈ nb de tokens générés. Dict conservé pour permettre une
 # future modulation par mode si besoin.
 MAX_NEW_TOKENS = {"baseline": 512, "improved": 512, "advanced": 512}
+JSON_VALID_RETRY_ATTEMPTS = 2
+
+
+def _repair_messages(image: Image.Image, mode: str) -> list[dict[str, Any]]:
+    return [
+        {"role": "system", "content": [{"type": "text", "text": SYSTEM}]},
+        {"role": "user", "content": [
+            {"type": "image", "image": image},
+            {"type": "text", "text": PROMPTS[mode]},
+            {"type": "text", "text": "Ta réponse précédente n'était pas un JSON valide. Réponds uniquement avec un objet JSON strict, sans texte additionnel, sans markdown et sans fences."},
+        ]},
+    ]
 
 # ======================================================================================
 # pipeline de prédiction pour MedGemma
@@ -226,14 +238,20 @@ def medgemma_predict(image_path: str | Path, mode: str = "baseline", device: str
     # NB : on garde l'échantillonnage par défaut du modèle (la génération greedy
     # forcée dégradait la validité du JSON sur les images de test). La reproductibilité
     # déterministe sera traitée plus tard via le prompt (phase S3/S4), pas ici.
-    out = pipe(
-        text=messages,
-        generate_kwargs={"max_new_tokens": max_new_tokens},
-    )
+    result: dict[str, Any] = {}
+    for attempt in range(JSON_VALID_RETRY_ATTEMPTS + 1):
+        out = pipe(
+            text=messages,
+            generate_kwargs={"max_new_tokens": max_new_tokens},
+        )
+        raw = out[0]["generated_text"][-1]["content"]
+        result = _coerce_json(raw)
+        if result.get("_json_valid", False):
+            break
+        if attempt < JSON_VALID_RETRY_ATTEMPTS:
+            messages = _repair_messages(image, mode)
     latency_ms = int((time.perf_counter() - start) * 1000)
 
-    raw = out[0]["generated_text"][-1]["content"]
-    result = _coerce_json(raw)
     # json_valid = le modèle a-t-il produit un JSON *réellement* parsable et complet ?
     # `_coerce_json` pose `_json_valid` (booléen explicite) : il vaut False dès qu'on a dû
     # récupérer la classe d'une sortie tronquée, même si la prédiction est correcte. Ainsi

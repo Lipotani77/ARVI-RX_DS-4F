@@ -42,7 +42,7 @@ def main() -> None:
 
     # 1) Premier appel → charge MedGemma et met `_PIPE` en cache. Sert aussi de
     #    prédiction d'échantillon pour le contrat schéma / garde-fous.
-    sample_pred = apply_safety_guardrails(medgemma_predict(image_path, mode="baseline"))
+    sample_pred = apply_safety_guardrails(medgemma_predict(image_path, mode="baseline"), image_path=image_path)
 
     # 2) Évaluation jouet : `run` rappelle `medgemma_predict` pour chaque cas → cache
     #    hit, le modèle n'est PAS rechargé. Mêmes sorties CSV/JSON que run_evaluation.main().

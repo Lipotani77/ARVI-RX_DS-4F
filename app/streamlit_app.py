@@ -264,7 +264,7 @@ with tab1:
                     raw_pred = toy_predict(tmp_path, mode=mode)
                 latency = int((time.time() - start_time) * 1000)
                 
-                pred = apply_safety_guardrails(raw_pred)
+                pred = apply_safety_guardrails(raw_pred, image_path=tmp_path)
                 pred["latency_ms"] = latency
                 
                 st.session_state["current_analysis"] = pred
