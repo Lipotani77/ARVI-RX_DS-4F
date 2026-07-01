@@ -196,6 +196,31 @@ textarea {
 h1, h2, h3 { color: #001F3F !important; font-weight: 800 !important; letter-spacing: -0.5px; }
 [data-testid="stMetricValue"] { color: #008080 !important; font-size: 2.5rem !important; font-weight: 900 !important;}
 
+/* Floating Chat Widget (Hacking CSS) */
+div[data-testid="stExpander"]:last-of-type {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 350px !important;
+    z-index: 999999 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 2px solid #00ced1 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 40px rgba(0,31,63,0.3) !important;
+}
+div[data-testid="stExpander"]:last-of-type summary {
+    background: linear-gradient(90deg, #001F3F 0%, #008080 100%) !important;
+    border-radius: 8px !important;
+    padding: 10px 15px !important;
+}
+div[data-testid="stExpander"]:last-of-type summary p {
+    color: white !important;
+    font-weight: bold !important;
+}
+div[data-testid="stExpander"]:last-of-type .stMarkdown p {
+    color: #001F3F !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -262,7 +287,7 @@ with st.sidebar:
         st.rerun()
 
 # Onglets
-tab1, tab2, tab3, tab4 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation", "💬 Assistant Support"])
+tab1, tab2, tab3 = st.tabs(["Scanner un patient", "Centre Analytique", "Documentation Technique"])
 
 with tab1:
     col_upload, col_context = st.columns([2, 1])
@@ -444,34 +469,48 @@ with tab3:
     else:
         st.warning("Document introuvable.")
 
-with tab4:
-    st.markdown("### 🤖 ARVI-Bot (Support Technique)")
-    st.info("Posez vos questions sur le fonctionnement du logiciel, les erreurs ou l'analyse des radiographies.")
+with tab3:
+    guide_path = Path(__file__).resolve().parent.parent / "docs" / "guide_utilisateur.md"
+    if guide_path.exists():
+        with open(guide_path, "r", encoding="utf-8") as f:
+            st.markdown(f.read())
+    else:
+        st.warning("Document introuvable.")
+
+# --- FLOATING CHATBOT WIDGET ---
+with st.expander("💬 ARVI-Bot (Cliquez pour ouvrir)", expanded=False):
+    st.markdown("<small style='color: #008080;'>Posez vos questions sur le projet, l'IA ou l'application.</small>", unsafe_allow_html=True)
     
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Bonjour Dr. Moreau. Comment puis-je vous aider aujourd'hui avec le terminal ARVI-RX ?"}]
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Posez votre question à ARVI-Bot..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        p_lower = prompt.lower()
-        if "analyse" in p_lower or "comment" in p_lower:
-            response = "Pour analyser un patient, rendez-vous dans l'onglet **Scanner un patient**. Importez une image dans la zone de dépôt et cliquez sur **LANCER LE DIAGNOSTIC IA**."
-        elif "erreur" in p_lower or "bug" in p_lower or "marche pas" in p_lower or "uncertain" in p_lower:
-            response = "Si vous rencontrez une erreur (par exemple UNCERTAIN), nos algorithmes (Guardrails) ont probablement détecté une image de mauvaise qualité ou non-frontale. Essayez avec un cliché plus net."
-        elif "qui" in p_lower or "equipe" in p_lower or "créateur" in p_lower:
-            response = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists (Leila, William, Killian, Thomas, Iza et Victor) afin de révolutionner l'imagerie médicale !"
-        elif "merci" in p_lower:
-            response = "Je vous en prie ! N'hésitez pas si vous avez d'autres questions."
-        else:
-            response = "Je suis l'assistant de premier niveau ARVI-Bot. Pour des problèmes plus complexes concernant l'API MedGemma, veuillez vous référer à la section **Documentation**."
-
-        with st.chat_message("assistant"):
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [{"role": "🤖 ARVI-Bot", "content": "Bonjour ! Je suis programmé pour répondre aux questions du jury."}]
+        
+    for msg in st.session_state.chat_history:
+        color = "#001F3F" if "ARVI-Bot" in msg['role'] else "#00ced1"
+        st.markdown(f"<strong style='color:{color}'>{msg['role']}</strong>: {msg['content']}", unsafe_allow_html=True)
+        
+    with st.form("chat_form", clear_on_submit=True):
+        cols = st.columns([4, 1.5])
+        with cols[0]:
+            user_input = st.text_input("Message...", label_visibility="collapsed", placeholder="Posez une question...")
+        with cols[1]:
+            submitted = st.form_submit_button("Envoyer", use_container_width=True)
+            
+        if submitted and user_input:
+            st.session_state.chat_history.append({"role": "👤 Vous", "content": user_input})
+            
+            p_lower = user_input.lower()
+            if any(k in p_lower for k in ["python", "streamlit", "sqlite", "stack", "techno", "architecture"]):
+                rep = "Notre architecture repose sur Python avec Streamlit pour une interface web réactive et performante, ainsi qu'une base de données SQLite locale assurant la traçabilité HDS."
+            elif any(k in p_lower for k in ["modèle", "ia", "vlm", "medgemma"]):
+                rep = "Nous utilisons un modèle VLM (Vision-Language Model), capable d'interpréter simultanément du texte et de l'image, affiné pour la radiologie thoracique frontale."
+            elif any(k in p_lower for k in ["budget", "marché", "cible", "vendre", "argent"]):
+                rep = "Notre cible : les services d'urgence et les cabinets de radiologie. L'objectif est de réduire le temps de diagnostic, désengorger les urgences et rentabiliser l'investissement logiciel par l'optimisation du temps médical."
+            elif any(k in p_lower for k in ["medecin", "remplacer", "éthique", "limite"]):
+                rep = "Éthique : ARVI-RX est un outil d'aide à la décision (Copilote). La validation finale (Human-in-the-loop) incombe toujours au praticien. L'IA ne remplace pas le médecin."
+            elif any(k in p_lower for k in ["équipe", "qui", "créateur"]):
+                rep = "Le système ARVI-RX a été développé par une brillante équipe d'ingénieurs Data Scientists : Leila, William, Killian, Thomas, Iza et Victor !"
+            else:
+                rep = "Je suis l'assistant virtuel. Je peux vous renseigner sur la technique, le modèle IA, le budget ou l'équipe !"
+                
+            st.session_state.chat_history.append({"role": "🤖 ARVI-Bot", "content": rep})
+            st.rerun()
